@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,35 +7,88 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header>
-    <h1>Trading Dashboard</h1>
-    <span id="status" class="status">connecting…</span>
-  </header>
-
-  <section id="cards" class="cards"></section>
-
-  <section class="panel">
-    <h2>Equity Curve</h2>
-    <div class="chart-wrap">
-      <canvas id="equity"></canvas>
-      <div id="tip" class="tip"></div>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">🔥</div>
     </div>
-  </section>
+    <nav class="nav">
+      <a class="nav-item active"><span class="ico">▦</span>Dashboard</a>
+      <a class="nav-item"><span class="ico">▤</span>Journal</a>
+      <a class="nav-item"><span class="ico">◔</span>Einblicke</a>
+      <a class="nav-item"><span class="ico">▧</span>Tägliche Analyse</a>
+      <a class="nav-item"><span class="ico">⟐</span>Strategien</a>
+      <a class="nav-item"><span class="ico">▢</span>Trading-Plan</a>
+      <a class="nav-item"><span class="ico">◍</span>Community</a>
+      <a class="nav-item"><span class="ico">⇩</span>Import</a>
+      <a class="nav-item"><span class="ico">▣</span>Werkzeuge</a>
+      <a class="nav-item"><span class="ico">▥</span>Konten</a>
+      <a class="nav-item"><span class="ico">?</span>Hilfe</a>
+      <a class="nav-item"><span class="ico">◑</span>Benutzerprofil</a>
+      <a class="nav-item"><span class="ico">⏻</span>Abmelden</a>
+    </nav>
+  </aside>
 
-  <section class="panel">
-    <h2>Trades</h2>
-    <table id="trades">
-      <thead>
-        <tr>
-          <th>Close Time</th><th>Symbol</th><th>Side</th>
-          <th class="num">Volume</th><th class="num">Open</th>
-          <th class="num">Close</th><th class="num">Net P&L</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </section>
+  <main class="main">
+    <header class="topbar">
+      <h1><span class="ico gold">▦</span> Dashboard</h1>
+      <div class="date-nav">
+        <span class="arrow">‹</span>
+        <span class="date" id="topDate">–</span>
+        <span class="ico">▦</span>
+        <span class="arrow">›</span>
+        <button class="btn-today">HEUTE</button>
+      </div>
+      <span class="status" id="status">connecting…</span>
+    </header>
 
+    <div class="period-label"><span class="ico">▦</span> <span id="periodLabel">ÜBERSICHT</span></div>
+
+    <section class="summary-row">
+      <div class="card">
+        <div class="big-pnl" id="bigPnl">–</div>
+        <div class="sub">PnL</div>
+        <div class="mini-chart"><canvas id="equityChart"></canvas></div>
+      </div>
+
+      <div class="card wr-card">
+        <div>
+          <div class="big-pct" id="bigWinRate">–</div>
+          <div class="sub">Gewinnrate</div>
+        </div>
+        <div class="donut-wrap">
+          <canvas id="donutChart"></canvas>
+          <div class="donut-center"><span id="donutCount">0</span><small>Trades</small></div>
+        </div>
+        <ul class="legend">
+          <li><i class="dot green"></i>Gewinne</li>
+          <li><i class="dot red"></i>Verluste</li>
+          <li><i class="dot gray"></i>Breakeven</li>
+        </ul>
+      </div>
+
+      <div class="card pf-card">
+        <div class="sub center">Gewinnfaktor</div>
+        <div class="gauge-wrap">
+          <canvas id="gaugeChart"></canvas>
+          <div class="gauge-center" id="gaugeValue">–</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="breakdown-row">
+      <div class="card"><div class="card-title">PnL</div><div class="chart"><canvas id="byDayChart"></canvas></div></div>
+      <div class="card"><div class="card-title">P&L nach Stunde</div><div class="chart"><canvas id="pnlHourChart"></canvas></div></div>
+      <div class="card"><div class="card-title">Gewinnfaktor nach Stunden</div><div class="chart"><canvas id="pfHourChart"></canvas></div></div>
+      <div class="card"><div class="card-title">Gewinnrate nach Stunden</div><div class="chart"><canvas id="wrHourChart"></canvas></div></div>
+    </section>
+
+    <div class="period-label"><span class="ico gold">▦</span> <span class="gold" id="calMonth">MONAT</span></div>
+    <section class="card calendar-card">
+      <div id="calendar" class="calendar"></div>
+    </section>
+  </main>
+
+  <script src="vendor/chart.umd.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

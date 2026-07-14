@@ -1,227 +1,219 @@
-const money = (n) =>
-  (n < 0 ? "-" : "") + "$" + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const moneyShort = (n) => (n < 0 ? "-" : "") + "$" + Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
+const GREEN = "#22c55e", RED = "#f43f5e", CYAN = "#22d3ee", GOLD = "#e9b308", GRAY = "#6b7280";
+const money = (n) => (n < 0 ? "-" : "") + "$" + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pct = (n) => (n * 100).toFixed(1) + "%";
 const cls = (n) => (n > 0 ? "pos" : n < 0 ? "neg" : "");
-const fmtTime = (t) => (t || "").replace("T", " ").slice(0, 16);
+const signColor = (n) => (n >= 0 ? GREEN : RED);
+const MONTHS = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
 
-let lastCurve = [];
-let curveGeom = null;
+Chart.defaults.color = "#7d8898";
+Chart.defaults.font.family = "-apple-system, Segoe UI, Roboto, sans-serif";
+Chart.defaults.font.size = 10;
+Chart.defaults.borderColor = "#1c2534";
+Chart.defaults.animation = false;
+Chart.defaults.maintainAspectRatio = false;
+Chart.defaults.plugins.legend.display = false;
+
+const charts = {};
+function mk(id, config) {
+  const el = document.getElementById(id);
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(el.getContext("2d"), config);
+  return charts[id];
+}
 
 async function refresh() {
   const status = document.getElementById("status");
   try {
-    const [metrics, trades] = await Promise.all([
-      fetch("/api/metrics").then((r) => r.json()),
-      fetch("/api/trades").then((r) => r.json()),
-    ]);
-    renderCards(metrics);
-    lastCurve = metrics.equityCurve;
-    renderEquity(lastCurve);
-    renderTrades(trades);
+    const d = await fetch("/api/analytics").then((r) => r.json());
+    render(d);
     status.textContent = "live · " + new Date().toLocaleTimeString();
     status.className = "status live";
-  } catch {
+  } catch (e) {
     status.textContent = "connection error";
     status.className = "status error";
   }
 }
 
-function renderCards(m) {
-  const cards = [
-    { label: "Net P&L", value: money(m.netPnl), cls: cls(m.netPnl) },
-    { label: "Trades", value: String(m.totalTrades) },
-    { label: "Win Rate", value: pct(m.winRate) },
-    { label: "Profit Factor", value: m.profitFactor == null ? "∞" : m.profitFactor.toFixed(2) },
-    { label: "Avg Win", value: money(m.avgWin), cls: "pos" },
-    { label: "Avg Loss", value: money(m.avgLoss), cls: "neg" },
-    { label: "Max Drawdown", value: money(-m.maxDrawdown), cls: "neg" },
-  ];
-  document.getElementById("cards").innerHTML = cards
-    .map(
-      (c) =>
-        `<div class="card"><div class="label">${c.label}</div><div class="value ${c.cls || ""}">${c.value}</div></div>`
-    )
-    .join("");
+function render(d) {
+  const m = d.metrics;
+
+  // Top summary numbers
+  const bp = document.getElementById("bigPnl");
+  bp.textContent = money(m.netPnl);
+  bp.className = "big-pnl " + cls(m.netPnl);
+  document.getElementById("bigWinRate").textContent = pct(m.winRate);
+  document.getElementById("donutCount").textContent = m.totalTrades;
+  document.getElementById("gaugeValue").textContent = m.profitFactor == null ? "∞" : m.profitFactor.toFixed(2);
+
+  renderEquity(m.equityCurve);
+  renderDonut(d.donut);
+  renderGauge(m.profitFactor);
+  renderByDay(d.byDay);
+  renderHourBars(d.byHour);
+  renderCalendar(d.calendar);
+
+  const now = new Date();
+  document.getElementById("topDate").textContent = now.toLocaleDateString("de-DE");
 }
 
 function renderEquity(curve) {
-  const canvas = document.getElementById("equity");
-  const ctx = canvas.getContext("2d");
-  const dpr = window.devicePixelRatio || 1;
-
-  // Use the CSS layout size as the source of truth — never the backing store,
-  // so the canvas can't grow on repeated renders.
-  const w = canvas.clientWidth;
-  const h = canvas.clientHeight;
-  canvas.width = Math.round(w * dpr);
-  canvas.height = Math.round(h * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, w, h);
-
-  if (curve.length === 0) {
-    ctx.fillStyle = "#8a94a3";
-    ctx.font = "13px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("No trades yet", w / 2, h / 2);
-    curveGeom = null;
-    return;
-  }
-
-  const padL = 56;
-  const padR = 12;
-  const padT = 12;
-  const padB = 22;
-
-  // Include the starting baseline (0) so a single trade still renders sensibly.
-  const eqs = [0, ...curve.map((p) => p.equity)];
-  let min = Math.min(...eqs);
-  let max = Math.max(...eqs);
-  if (min === max) { min -= 1; max += 1; }
-  const pad = (max - min) * 0.08;
-  min -= pad;
-  max += pad;
-  const range = max - min;
-
-  const n = curve.length;
-  const x = (i) => padL + (n === 1 ? 0.5 : i / (n - 1)) * (w - padL - padR);
-  const y = (v) => padT + (1 - (v - min) / range) * (h - padT - padB);
-
-  // Horizontal gridlines + y labels
-  ctx.font = "11px sans-serif";
-  ctx.textBaseline = "middle";
-  const ticks = 4;
-  for (let t = 0; t <= ticks; t++) {
-    const v = min + (range * t) / ticks;
-    const gy = y(v);
-    ctx.strokeStyle = "#20262e";
-    ctx.beginPath();
-    ctx.moveTo(padL, gy);
-    ctx.lineTo(w - padR, gy);
-    ctx.stroke();
-    ctx.fillStyle = "#6b7480";
-    ctx.textAlign = "right";
-    ctx.fillText(moneyShort(v), padL - 8, gy);
-  }
-
-  // Zero baseline (emphasised)
-  if (min < 0 && max > 0) {
-    ctx.strokeStyle = "#3a424c";
-    ctx.setLineDash([3, 3]);
-    ctx.beginPath();
-    ctx.moveTo(padL, y(0));
-    ctx.lineTo(w - padR, y(0));
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  const last = curve[n - 1].equity;
-  const color = last >= 0 ? "#26a269" : "#e0523b";
-
-  // Area fill under the line
-  const grad = ctx.createLinearGradient(0, padT, 0, h - padB);
-  grad.addColorStop(0, last >= 0 ? "rgba(38,162,105,0.28)" : "rgba(224,82,59,0.28)");
-  grad.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.beginPath();
-  ctx.moveTo(x(0), y(Math.max(min, Math.min(max, 0))));
-  curve.forEach((p, i) => ctx.lineTo(x(i), y(p.equity)));
-  ctx.lineTo(x(n - 1), y(Math.max(min, Math.min(max, 0))));
-  ctx.closePath();
-  ctx.fillStyle = grad;
-  ctx.fill();
-
-  // Equity line
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2;
-  ctx.lineJoin = "round";
-  ctx.beginPath();
-  curve.forEach((p, i) => (i === 0 ? ctx.moveTo(x(i), y(p.equity)) : ctx.lineTo(x(i), y(p.equity))));
-  ctx.stroke();
-
-  // x-axis first/last labels
-  ctx.fillStyle = "#6b7480";
-  ctx.textBaseline = "alphabetic";
-  ctx.textAlign = "left";
-  ctx.fillText(fmtTime(curve[0].time), padL, h - 6);
-  ctx.textAlign = "right";
-  ctx.fillText(fmtTime(curve[n - 1].time), w - padR, h - 6);
-
-  curveGeom = { curve, x, y, w, h, padL, padR, padT, padB, color };
-}
-
-// Hover tooltip on the equity curve
-function setupTooltip() {
-  const canvas = document.getElementById("equity");
-  const tip = document.getElementById("tip");
-  canvas.addEventListener("mousemove", (e) => {
-    if (!curveGeom) return (tip.style.display = "none");
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const { curve, x, y, color } = curveGeom;
-    let best = 0;
-    let bestD = Infinity;
-    curve.forEach((_, i) => {
-      const d = Math.abs(x(i) - mx);
-      if (d < bestD) { bestD = d; best = i; }
-    });
-    const p = curve[best];
-    redrawWithMarker(best);
-    tip.style.display = "block";
-    tip.style.left = Math.min(x(best) + 12, rect.width - 140) + "px";
-    tip.style.top = y(p.equity) - 8 + "px";
-    tip.innerHTML = `<span style="color:${color}">${money(p.equity)}</span><br><span class="tip-sub">${fmtTime(p.time)}</span>`;
-  });
-  canvas.addEventListener("mouseleave", () => {
-    tip.style.display = "none";
-    renderEquity(lastCurve);
+  const labels = curve.map((_, i) => i);
+  const data = curve.map((p) => p.equity);
+  const up = (data[data.length - 1] ?? 0) >= 0;
+  mk("equityChart", {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        data,
+        borderColor: CYAN,
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.25,
+        fill: true,
+        backgroundColor: (ctx) => {
+          const { ctx: c, chartArea } = ctx.chart;
+          if (!chartArea) return "transparent";
+          const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          g.addColorStop(0, up ? "rgba(34,197,94,0.35)" : "rgba(244,63,94,0.30)");
+          g.addColorStop(1, "rgba(34,197,94,0)");
+          return g;
+        },
+      }],
+    },
+    options: {
+      plugins: { tooltip: { callbacks: { title: (i) => "Trade " + (i[0].dataIndex + 1), label: (c) => money(c.parsed.y) } } },
+      scales: {
+        x: { display: false },
+        y: { grid: { color: "rgba(255,255,255,0.04)" }, ticks: { maxTicksLimit: 4, callback: (v) => "$" + v } },
+      },
+    },
   });
 }
 
-function redrawWithMarker(idx) {
-  renderEquity(lastCurve);
-  if (!curveGeom) return;
-  const { curve, x, y, color, padT, h, padB } = curveGeom;
-  const ctx = document.getElementById("equity").getContext("2d");
-  const px = x(idx);
-  const py = y(curve[idx].equity);
-  ctx.strokeStyle = "#3a424c";
-  ctx.beginPath();
-  ctx.moveTo(px, padT);
-  ctx.lineTo(px, h - padB);
-  ctx.stroke();
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(px, py, 4, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#0f1216";
-  ctx.lineWidth = 2;
-  ctx.stroke();
+function renderDonut(donut) {
+  const { wins, losses, breakeven } = donut;
+  const empty = wins + losses + breakeven === 0;
+  mk("donutChart", {
+    type: "doughnut",
+    data: {
+      labels: ["Gewinne", "Verluste", "Breakeven"],
+      datasets: [{
+        data: empty ? [1] : [wins, losses, breakeven],
+        backgroundColor: empty ? ["#1c2534"] : [GREEN, RED, GRAY],
+        borderWidth: 0,
+      }],
+    },
+    options: { cutout: "72%", plugins: { tooltip: { enabled: !empty } } },
+  });
 }
 
-function renderTrades(trades) {
-  const tbody = document.querySelector("#trades tbody");
-  if (trades.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty">No trades yet — waiting for ATAS…</td></tr>`;
-    return;
+function renderGauge(pf) {
+  const max = 3;
+  const val = pf == null ? max : Math.max(0, Math.min(max, pf));
+  mk("gaugeChart", {
+    type: "doughnut",
+    data: {
+      datasets: [{
+        data: [val, max - val],
+        backgroundColor: [pf != null && pf >= 1 ? GREEN : CYAN, "#1c2534"],
+        borderWidth: 0,
+      }],
+    },
+    options: { rotation: -90, circumference: 180, cutout: "70%", plugins: { tooltip: { enabled: false } } },
+  });
+}
+
+function renderByDay(byDay) {
+  mk("byDayChart", {
+    type: "bar",
+    data: {
+      labels: byDay.map((d) => d.date.slice(5)),
+      datasets: [{
+        data: byDay.map((d) => d.pnl),
+        backgroundColor: byDay.map((d) => (d.pnl >= 0 ? "rgba(34,197,94,.8)" : "rgba(244,63,94,.8)")),
+        borderRadius: 3,
+      }],
+    },
+    options: {
+      plugins: { tooltip: { callbacks: { label: (c) => money(c.parsed.y) } } },
+      scales: {
+        x: { grid: { display: false } },
+        y: { grid: { color: "rgba(255,255,255,0.04)" }, ticks: { maxTicksLimit: 5 } },
+      },
+    },
+  });
+}
+
+function hbar(id, byHour, valueFn, colorFn, xFmt, xMax) {
+  mk(id, {
+    type: "bar",
+    data: {
+      labels: byHour.map((h) => h.label),
+      datasets: [{
+        data: byHour.map(valueFn),
+        backgroundColor: byHour.map(colorFn),
+        borderRadius: 3,
+        barThickness: 16,
+      }],
+    },
+    options: {
+      indexAxis: "y",
+      plugins: { tooltip: { callbacks: { label: (c) => xFmt(c.parsed.x) } } },
+      scales: {
+        x: { grid: { color: "rgba(255,255,255,0.04)" }, ticks: { callback: xFmt }, ...(xMax != null ? { max: xMax, min: 0 } : {}) },
+        y: { grid: { display: false } },
+      },
+    },
+  });
+}
+
+function renderHourBars(byHour) {
+  hbar("pnlHourChart", byHour, (h) => h.pnl, (h) => (h.pnl >= 0 ? GREEN : RED), (v) => money(v));
+  hbar("pfHourChart", byHour, (h) => (h.profitFactor == null ? 10 : Math.min(h.profitFactor, 10)),
+    (h) => (h.profitFactor != null && h.profitFactor >= 1 ? GREEN : CYAN), (v) => v.toFixed(2), 10);
+  hbar("wrHourChart", byHour, (h) => h.winRate * 100,
+    (h) => (h.winRate >= 0.5 ? GREEN : GOLD), (v) => v.toFixed(0) + "%", 100);
+}
+
+function calCell(stat) {
+  if (!stat) return `<div class="cal-cell empty"></div>`;
+  const has = stat.trades > 0;
+  return `<div class="cal-cell">
+    <div class="cal-day">${stat.day}</div>
+    ${has ? `<div class="cal-pnl ${cls(stat.pnl)}">${money(stat.pnl)}</div>
+      <div class="cal-meta">${pct(stat.winRate)}</div>
+      <div class="cal-meta">${stat.trades} trades</div>` : ""}
+  </div>`;
+}
+
+function weekCell(w) {
+  const has = w.trades > 0;
+  return `<div class="cal-cell week">
+    <div class="cal-week-label">KW ${w.week}</div>
+    <span class="cal-sigma">Σ</span>
+    ${has ? `<div class="cal-pnl ${cls(w.pnl)}">${money(w.pnl)}</div>
+      <div class="cal-meta">${pct(w.winRate)}</div>
+      <div class="cal-meta">${w.trades} trades</div>` : ""}
+  </div>`;
+}
+
+function renderCalendar(cal) {
+  document.getElementById("calMonth").textContent = (MONTHS[cal.month] + " " + cal.year).toUpperCase();
+  const heads = ["MONTAG", "DIENSTAG", "MITTWOCH", "DONNERSTAG", "FREITAG", "WOCHE"];
+  let html = `<div class="cal-row cal-head">${heads.map((h) => `<div class="cal-cell">${h}</div>`).join("")}</div>`;
+  for (const w of cal.weeks) {
+    html += `<div class="cal-row">${w.days.map(calCell).join("")}${weekCell(w)}</div>`;
   }
-  tbody.innerHTML = trades
-    .slice()
-    .reverse()
-    .map((t) => {
-      const net = t.pnl - t.commission;
-      return `<tr>
-        <td>${fmtTime(t.close_time)}</td>
-        <td class="sym">${t.symbol}</td>
-        <td><span class="pill ${t.direction}">${t.direction}</span></td>
-        <td class="num">${t.volume}</td>
-        <td class="num">${t.open_price ?? "–"}</td>
-        <td class="num">${t.close_price ?? "–"}</td>
-        <td class="num ${cls(net)}">${money(net)}</td>
-      </tr>`;
-    })
-    .join("");
+  html += `<div class="cal-row">${Array(5).fill(`<div class="cal-cell empty"></div>`).join("")}
+    <div class="cal-cell month">
+      <div class="cal-week-label">Monat</div><span class="cal-sigma">Σ</span>
+      <div class="cal-pnl ${cls(cal.pnl)}">${money(cal.pnl)}</div>
+      <div class="cal-meta">${pct(cal.winRate)}</div>
+      <div class="cal-meta">${cal.trades} trades</div>
+    </div></div>`;
+  document.getElementById("calendar").innerHTML = html;
 }
 
-setupTooltip();
 refresh();
 setInterval(refresh, 3000);

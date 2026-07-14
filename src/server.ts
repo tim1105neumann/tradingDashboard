@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { getTrades, insertTrade } from "./db.js";
 import { NormalizeError, normalizeAtasTrade } from "./normalize.js";
-import { computeMetrics } from "./metrics.js";
+import { computeAnalytics, computeMetrics } from "./metrics.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 4000;
@@ -40,6 +40,11 @@ app.get("/api/trades", (_req, res) => {
 
 app.get("/api/metrics", (_req, res) => {
   res.json(computeMetrics(getTrades()));
+});
+
+app.get("/api/analytics", (_req, res) => {
+  const trades = getTrades();
+  res.json({ metrics: computeMetrics(trades), ...computeAnalytics(trades) });
 });
 
 // --- Static dashboard UI ---
