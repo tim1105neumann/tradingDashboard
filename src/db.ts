@@ -59,6 +59,19 @@ export interface Trade {
 
 export type NewTrade = Omit<Trade, "id" | "received_at" | "rating" | "labels">;
 
+// ATAS timestamps arrive an hour behind this user's local time. Shift on read so
+// all views (hour buckets, detail page, calendar) show the correct local time.
+// Change the default (or set TZ_OFFSET_HOURS env var) if your offset differs.
+const TZ_OFFSET_HOURS = Number(process.env.TZ_OFFSET_HOURS ?? 1);
+
+function shiftIso(iso: string | null, hours: number): string | null {
+  if (!iso || hours === 0) return iso;
+  const d = new Date(iso + "Z"); // treat the naive timestamp as a wall clock
+  if (Number.isNaN(d.getTime())) return iso;
+  d.setUTCHours(d.getUTCHours() + hours);
+  return d.toISOString().slice(0, 19); // back to "YYYY-MM-DDTHH:MM:SS"
+}
+
 // DB rows store `labels` as a JSON string; convert to the typed Trade shape.
 function hydrate(row: Record<string, unknown>): Trade {
   let labels: string[] = [];
@@ -66,6 +79,9 @@ function hydrate(row: Record<string, unknown>): Trade {
   const trade = { ...(row as unknown as Trade), rating: Number(row.rating ?? 0), labels };
   const spec = resolveSymbol(trade.symbol);
   trade.symbol = spec.ticker; // long ATAS name -> clean ticker
+
+  trade.open_time = shiftIso(trade.open_time, TZ_OFFSET_HOURS);
+  trade.close_time = shiftIso(trade.close_time, TZ_OFFSET_HOURS) as string;
 
   // For known instruments, derive P&L deterministically from price x contract spec.
   // ATAS's reported RealizedPnL is unreliable across accounts/positions, so we override it.
