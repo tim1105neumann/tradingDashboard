@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Globalization;
+using System.IO;
 using System.Net.Http;
 using System.Text;
 using ATAS.DataFeedsCore;
@@ -40,6 +41,12 @@ namespace TradingDashboard
         private DateTime _openTime;    // time of first entry fill
         private decimal _realizedBaseline; // ATAS realized PnL captured at last flat
 
+        // Diagnostics are written to this file (open it and paste lines back to iterate).
+        private static readonly string LogPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+            "ATAS", "trade-exporter.log");
+        private static readonly object LogLock = new object();
+
         public TradeExporterIndicator()
         {
             // This indicator draws nothing; it only reacts to trading events.
@@ -59,7 +66,7 @@ namespace TradingDashboard
                 var comm = myTrade.Commission ?? 0m;
                 var symbol = myTrade.Security?.ToString() ?? "UNKNOWN";
 
-                this.LogWarn($"[export] fill {(isBuy ? "BUY" : "SELL")} {vol} @ {price} net(before)={_net}");
+                Log($"[export] fill {(isBuy ? "BUY" : "SELL")} {vol} @ {price} net(before)={_net}");
 
                 _commission += comm;
                 var dirSign = isBuy ? 1 : -1;
@@ -105,7 +112,7 @@ namespace TradingDashboard
             }
             catch (Exception ex)
             {
-                this.LogError($"[export] OnNewMyTrade failed: {ex.Message}");
+                Log($"[export] OnNewMyTrade failed: {ex.Message}");
             }
         }
 
@@ -122,7 +129,7 @@ namespace TradingDashboard
 
             var side = _posDir > 0 ? "Buy" : "Sell";
 
-            this.LogWarn($"[export] TRADE {symbol} {side} vol={_exitVol} entry={avgEntry} exit={avgExit} pnl={pnl} comm={_commission}");
+            Log($"[export] TRADE {symbol} {side} vol={_exitVol} entry={avgEntry} exit={avgExit} pnl={pnl} comm={_commission}");
 
             var json = BuildJson(symbol, side, _exitVol, avgEntry, avgExit, _openTime, closeTime, pnl, _commission);
             PostAsync(json);
@@ -167,11 +174,28 @@ namespace TradingDashboard
             {
                 using var content = new StringContent(json, Encoding.UTF8, "application/json");
                 var res = await Http.PostAsync(WebhookUrl, content).ConfigureAwait(false);
-                this.LogWarn($"[export] POST {(int)res.StatusCode} -> {WebhookUrl}");
+                Log($"[export] POST {(int)res.StatusCode} -> {WebhookUrl}");
             }
             catch (Exception ex)
             {
-                this.LogError($"[export] POST failed: {ex.Message}");
+                Log($"[export] POST failed: {ex.Message}");
+            }
+        }
+
+        private static void Log(string message)
+        {
+            try
+            {
+                var line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {message}{Environment.NewLine}";
+                lock (LogLock)
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(LogPath)!);
+                    File.AppendAllText(LogPath, line);
+                }
+            }
+            catch
+            {
+                // Never let logging break the indicator.
             }
         }
     }

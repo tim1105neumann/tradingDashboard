@@ -54,12 +54,15 @@ trade P&L. This add-on reads the real trade data from inside ATAS instead.
 ## Verify
 
 1. Start the dashboard (`npm start` in the project root) — keep the terminal visible.
-2. Open the ATAS **log window** (so you can see `[export]` lines).
-3. Do a small round-trip trade (open then close a position).
-4. You should see:
-   - In ATAS log: `[export] fill ...`, then `[export] TRADE ...`, then `[export] POST 201 ...`
-   - In the dashboard terminal: `[webhook] stored trade #N ...`
-   - The trade appears at http://localhost:4000
+2. Do a small round-trip trade (open then close a position).
+3. The add-on writes diagnostics to a log file:
+   ```
+   %USERPROFILE%\Documents\ATAS\trade-exporter.log
+   ```
+   Open it — you should see `[export] fill ...`, then `[export] TRADE ...`, then
+   `[export] POST 201 ...`
+4. In the dashboard terminal you should see `[webhook] stored trade #N ...`, and the
+   trade appears at http://localhost:4000
 
 ## Known first-version caveats (we'll tune against real output)
 
