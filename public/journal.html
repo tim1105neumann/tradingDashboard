@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Journal · Trading Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="main">
+    <header class="topbar">
+      <h1><span class="ico gold">▤</span> Journal</h1>
+      <span class="status" id="status">connecting…</span>
+    </header>
+
+    <div class="filter-bar">
+      <span class="filter-chip">Benutzerdefiniert ▾</span>
+      <span class="filter-chip gold" id="fromDate">–</span>
+      <span class="filter-chip"><span class="ico">▦</span></span>
+      <span class="filter-chip">Konto-IDs ▾</span>
+      <span class="filter-chip">Symbole ▾</span>
+      <span class="filter-chip">Labels ▾</span>
+      <span class="filter-spacer"></span>
+      <span class="ico">⟳</span>
+      <span class="filter-chip gold">⧩ ANWENDEN</span>
+      <span class="ico">⚙</span>
+    </div>
+
+    <div class="period-label"><span class="ico gold">📈</span> LEISTUNGSÜBERSICHT</div>
+
+    <section class="perf-grid">
+      <div class="card perf-chart">
+        <div class="card-title">PnL</div>
+        <div class="chart tall"><canvas id="pnlChart"></canvas></div>
+        <div class="toggle">
+          <button class="toggle-btn active">Candlesticks</button>
+          <button class="toggle-btn">Bar/Area</button>
+        </div>
+      </div>
+
+      <div class="stat-panels">
+        <div class="card stat-panel"><h3>Performance-Übersicht</h3><div class="stat-rows" id="statPerf"></div></div>
+        <div class="card stat-panel"><h3>Tradeanalyse</h3><div class="stat-rows" id="statAnalyse"></div></div>
+        <div class="card stat-panel"><h3>Risikomaße</h3><div class="stat-rows" id="statRisk"></div></div>
+        <div class="card stat-panel"><h3>Trade Details</h3><div class="stat-rows" id="statDetails"></div></div>
+      </div>
+    </section>
+
+    <div class="period-label"><span class="ico gold">▤</span> TRADES</div>
+
+    <div class="trades-toolbar">
+      <span class="muted"><span id="selCount">0</span> ausgewählt</span>
+      <span class="filter-chip">Aktion ▾</span>
+      <span class="filter-chip">Labels ▾</span>
+      <span class="filter-chip">LOS</span>
+      <span class="filter-spacer"></span>
+      <span class="filter-chip">Sort by ▾</span>
+      <span class="ico">↓</span>
+      <span class="filter-chip gold">TRADE HINZUFÜGEN</span>
+      <span class="filter-chip">EXPORTIEREN</span>
+    </div>
+
+    <section id="tradeList" class="trade-list"></section>
+
+    <div class="pager">
+      <span class="muted">Einträge pro Seite: 10</span>
+      <span class="muted" id="pageInfo">–</span>
+      <span class="arrow" id="prevPage">‹</span>
+      <span class="arrow" id="nextPage">›</span>
+    </div>
+  </main>
+
+  <script src="vendor/chart.umd.js"></script>
+  <script src="common.js"></script>
+  <script src="journal.js"></script>
+</body>
+</html>

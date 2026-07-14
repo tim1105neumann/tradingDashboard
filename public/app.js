@@ -1,9 +1,4 @@
-const GREEN = "#22c55e", RED = "#f43f5e", CYAN = "#22d3ee", GOLD = "#e9b308", GRAY = "#6b7280";
-const money = (n) => (n < 0 ? "-" : "") + "$" + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const pct = (n) => (n * 100).toFixed(1) + "%";
-const cls = (n) => (n > 0 ? "pos" : n < 0 ? "neg" : "");
-const signColor = (n) => (n >= 0 ? GREEN : RED);
-const MONTHS = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+renderSidebar("dashboard");
 
 Chart.defaults.color = "#7d8898";
 Chart.defaults.font.family = "-apple-system, Segoe UI, Roboto, sans-serif";
