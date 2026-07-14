@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trading Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Trading Dashboard</h1>
+    <span id="status" class="status">connecting…</span>
+  </header>
+
+  <section id="cards" class="cards"></section>
+
+  <section class="panel">
+    <h2>Equity Curve</h2>
+    <canvas id="equity" height="260"></canvas>
+  </section>
+
+  <section class="panel">
+    <h2>Trades</h2>
+    <table id="trades">
+      <thead>
+        <tr>
+          <th>Close Time</th><th>Symbol</th><th>Side</th>
+          <th class="num">Volume</th><th class="num">Open</th>
+          <th class="num">Close</th><th class="num">Net P&L</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>
