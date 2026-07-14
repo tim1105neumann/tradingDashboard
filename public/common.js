@@ -48,11 +48,29 @@ function tagColorMap(cats) {
   return m;
 }
 
+// Derive a readable chip palette from a category color: a dark background tint and
+// a light-tinted text of the same hue (high contrast, like the default chips).
+function hexToRgb(h) {
+  h = String(h).replace("#", "");
+  if (h.length === 3) h = h.split("").map((x) => x + x).join("");
+  return [parseInt(h.slice(0, 2), 16) || 0, parseInt(h.slice(2, 4), 16) || 0, parseInt(h.slice(4, 6), 16) || 0];
+}
+function mixRgb(a, b, t) { return a.map((v, i) => Math.round(v + (b[i] - v) * t)); }
+function chipColors(hex) {
+  const c = hexToRgb(hex);
+  return {
+    bg: `rgb(${mixRgb(c, [20, 24, 31], 0.8).join(",")})`,   // dark tinted background
+    fg: `rgb(${mixRgb(c, [255, 255, 255], 0.62).join(",")})`, // light readable text
+    bd: `rgb(${mixRgb(c, [20, 24, 31], 0.5).join(",")})`,   // visible border
+  };
+}
+
 // A tag chip; predefined tags get their category color, custom tags stay default.
 function tagChipHtml(label, colorMap, cls) {
   const color = colorMap && colorMap[label];
-  const style = color ? ` style="background:${color}22;color:${color};border:1px solid ${color}66"` : "";
-  return `<span class="label-chip ${cls || ""}${color ? " colored" : ""}"${style}>${escapeHtml(label)}</span>`;
+  if (!color) return `<span class="label-chip ${cls || ""}">${escapeHtml(label)}</span>`;
+  const { bg, fg, bd } = chipColors(color);
+  return `<span class="label-chip ${cls || ""} colored" style="background:${bg};color:${fg};border:1px solid ${bd}">${escapeHtml(label)}</span>`;
 }
 
 function renderSidebar(active) {

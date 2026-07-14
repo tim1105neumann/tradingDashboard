@@ -28,8 +28,8 @@ function save() {
 }
 
 function chip(c, t, ti) {
-  const col = c.color || "#e9b308";
-  return `<span class="label-chip colored" style="background:${col}22;color:${col};border:1px solid ${col}66">${escapeHtml(t)}<i class="x" data-ci="${c._i}" data-ti="${ti}">✕</i></span>`;
+  const { bg, fg, bd } = chipColors(c.color || "#e9b308");
+  return `<span class="label-chip colored" style="background:${bg};color:${fg};border:1px solid ${bd}">${escapeHtml(t)}<i class="x" data-ci="${c._i}" data-ti="${ti}">✕</i></span>`;
 }
 
 function render() {
