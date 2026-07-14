@@ -70,8 +70,8 @@ function renderEquity(curve) {
           const { ctx: c, chartArea } = ctx.chart;
           if (!chartArea) return "transparent";
           const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-          g.addColorStop(0, up ? "rgba(34,197,94,0.35)" : "rgba(244,63,94,0.30)");
-          g.addColorStop(1, "rgba(34,197,94,0)");
+          g.addColorStop(0, up ? "rgba(59,158,255,0.35)" : "rgba(255,128,56,0.30)");
+          g.addColorStop(1, "rgba(59,158,255,0)");
           return g;
         },
       }],
@@ -126,7 +126,7 @@ function renderByDay(byDay) {
       labels: byDay.map((d) => d.date.slice(5)),
       datasets: [{
         data: byDay.map((d) => d.pnl),
-        backgroundColor: byDay.map((d) => (d.pnl >= 0 ? "rgba(34,197,94,.8)" : "rgba(244,63,94,.8)")),
+        backgroundColor: byDay.map((d) => (d.pnl >= 0 ? "rgba(59,158,255,.8)" : "rgba(255,128,56,.8)")),
         borderRadius: 3,
       }],
     },

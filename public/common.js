@@ -1,5 +1,6 @@
 // Shared helpers + sidebar for all pages.
-const GREEN = "#22c55e", RED = "#f43f5e", CYAN = "#22d3ee", GOLD = "#e9b308", GRAY = "#6b7280";
+// Colorblind-safe: blue = gain, orange = loss (distinguishable for red-green colorblindness).
+const GREEN = "#3b9eff", RED = "#ff8038", CYAN = "#22d3ee", GOLD = "#e9b308", GRAY = "#6b7280";
 const MONTHS = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
 
 const money = (n) => (n < 0 ? "-" : "") + "$" + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

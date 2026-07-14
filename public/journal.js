@@ -141,7 +141,7 @@ function renderPnlChart(byDay) {
       labels: byDay.map((d) => d.date),
       datasets: [{
         data: byDay.map((d) => d.pnl),
-        backgroundColor: byDay.map((d) => (d.pnl >= 0 ? "rgba(34,197,94,.85)" : "rgba(244,63,94,.85)")),
+        backgroundColor: byDay.map((d) => (d.pnl >= 0 ? "rgba(59,158,255,.85)" : "rgba(255,128,56,.85)")),
         borderRadius: 3,
       }],
     },
