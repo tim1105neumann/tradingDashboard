@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { resolveSymbol } from "./instruments.js";
 
 const DB_PATH = resolve(process.cwd(), "data", "trades.db");
 mkdirSync(dirname(DB_PATH), { recursive: true });
@@ -62,7 +63,9 @@ export type NewTrade = Omit<Trade, "id" | "received_at" | "rating" | "labels">;
 function hydrate(row: Record<string, unknown>): Trade {
   let labels: string[] = [];
   try { labels = JSON.parse((row.labels as string) || "[]"); } catch { labels = []; }
-  return { ...(row as unknown as Trade), rating: Number(row.rating ?? 0), labels };
+  const trade = { ...(row as unknown as Trade), rating: Number(row.rating ?? 0), labels };
+  trade.symbol = resolveSymbol(trade.symbol).ticker; // long ATAS name -> clean ticker
+  return trade;
 }
 
 const insertStmt = db.prepare(`

@@ -26,11 +26,6 @@ function fmtDur(sec) {
   const m = Math.floor(sec / 60);
   return m < 60 ? `${m}m ${sec % 60}s` : `${Math.floor(m / 60)}h ${m % 60}m`;
 }
-function points(t) {
-  if (t.open_price == null || t.close_price == null) return null;
-  const d = t.direction === "short" ? t.open_price - t.close_price : t.close_price - t.open_price;
-  return Math.round(d * 100) / 100;
-}
 
 async function load() {
   let t;
@@ -112,7 +107,7 @@ function escapeHtml(s) {
 
 function renderSummary(t) {
   const n = net(t);
-  const pts = points(t);
+  const tk = tradeTicks(t);
   document.getElementById("summary").innerHTML = `
     <div class="sum-head">
       <div class="sum-sym"><span class="tsym">${t.symbol}</span><span class="pill ${t.direction}">${t.direction}</span></div>
@@ -126,7 +121,7 @@ function renderSummary(t) {
     <div class="sum-body">
       <div class="sum-pnl">
         <div class="big-pnl ${cls(n)}">${moneyEur(n)}</div>
-        <div class="sum-ticks"><span class="tlabel">DURCHSCHN. TICKS</span> <b>${pts ?? "–"}</b> &nbsp; <span class="tlabel">TICKS</span> <b>${pts ?? "–"}</b></div>
+        <div class="sum-ticks"><span class="tlabel">DURCHSCHN. TICKS</span> <b>${tk ?? "–"}</b> &nbsp; <span class="tlabel">TICKS</span> <b>${tk ?? "–"}</b></div>
       </div>
       <div class="sum-times">
         <div><span class="tlabel">ERÖFFNUNG</span><div class="gold">${fullTime(t.open_time)}</div><div class="tprice">${priceDe(t.open_price)}</div></div>
@@ -142,14 +137,14 @@ function statBox(label, value, cl) {
 
 function renderStats(t) {
   const n = net(t);
-  const pts = points(t);
+  const tk = tradeTicks(t);
   document.getElementById("stats").innerHTML = `
     <div class="stat-section">MANAGEMENT</div>
     <div class="stat-grid">
       ${statBox("TAKE PROFIT", n > 0 ? moneyEur(n) : "–", "pos")}
       ${statBox("STOP LOSS", n < 0 ? moneyEur(n) : "–", "neg")}
-      ${statBox("TP TICKS", pts != null && pts > 0 ? pts : "–")}
-      ${statBox("SL TICKS", pts != null && pts < 0 ? pts : "–")}
+      ${statBox("TP TICKS", tk != null && tk > 0 ? tk : "–")}
+      ${statBox("SL TICKS", tk != null && tk < 0 ? tk : "–")}
       ${statBox("POTENTIAL", "–")}
       ${statBox("SL BENÖTIGT", "–")}
     </div>

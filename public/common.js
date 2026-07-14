@@ -9,6 +9,15 @@ const cls = (n) => (n > 0 ? "pos" : n < 0 ? "neg" : "");
 const signColor = (n) => (n >= 0 ? GREEN : RED);
 const fmtTime = (t) => (t || "").replace("T", " ").slice(0, 16);
 
+// Tick sizes per ticker (symbol is already mapped to a clean ticker server-side).
+const TICK_SIZE = { MNQ: 0.25, MES: 0.25, NQ: 0.25, ES: 0.25 };
+function tradeTicks(t) {
+  const ts = TICK_SIZE[t.symbol];
+  if (ts == null || t.open_price == null || t.close_price == null) return null;
+  const d = t.direction === "short" ? t.open_price - t.close_price : t.close_price - t.open_price;
+  return Math.round(d / ts);
+}
+
 const NAV = [
   { key: "dashboard", label: "Dashboard", ico: "▦", href: "index.html" },
   { key: "journal", label: "Journal", ico: "▤", href: "journal.html" },

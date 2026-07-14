@@ -35,11 +35,10 @@ function fmtDur(sec) {
   if (m < 60) return s ? `${m}m ${s}s` : `${m}m`;
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
-function points(t) {
-  if (t.open_price == null || t.close_price == null) return null;
-  const d = t.direction === "short" ? t.open_price - t.close_price : t.close_price - t.open_price;
-  return Math.round(d * 100) / 100;
-}
+const avgTicks = (arr) => {
+  const xs = arr.map(tradeTicks).filter((x) => x != null);
+  return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
+};
 
 async function refresh() {
   const status = document.getElementById("status");
@@ -80,6 +79,17 @@ function renderStats(d, trades) {
   const maxWin = nets.length ? Math.max(...nets) : 0;
   const maxLoss = nets.length ? Math.min(...nets) : 0;
   const avgNet = total ? m.netPnl / total : 0;
+  // ticks
+  const netTicks = trades.reduce((s, t) => s + (tradeTicks(t) ?? 0), 0);
+  const winTrades = trades.filter((t) => net(t) > 0);
+  const lossTrades = trades.filter((t) => net(t) < 0);
+  let maxWinT = null, maxLossT = null;
+  for (const t of trades) {
+    if (maxWinT == null || net(t) > net(maxWinT)) maxWinT = t;
+    if (maxLossT == null || net(t) < net(maxLossT)) maxLossT = t;
+  }
+  const tk = (t) => (t && tradeTicks(t) != null ? tradeTicks(t) : "–");
+  const avgTk = (arr) => { const v = avgTicks(arr); return v == null ? "–" : v.toFixed(1); };
   let peak = 0, eq = 0;
   for (const p of m.equityCurve) { eq = p.equity; if (eq > peak) peak = eq; }
   const curDD = peak - (m.equityCurve.length ? m.equityCurve[m.equityCurve.length - 1].equity : 0);
@@ -88,8 +98,8 @@ function renderStats(d, trades) {
   statRows("statPerf", [
     ["Netto-P&L", moneyEur(m.netPnl), cls(m.netPnl)],
     ["P&L", moneyEur(sumPnl), cls(sumPnl)],
-    ["Net Ticks", "–", ""],
-    ["Ticks", "–", ""],
+    ["Net Ticks", netTicks, cls(netTicks)],
+    ["Ticks", netTicks, cls(netTicks)],
     ["Gewinnfaktor", m.profitFactor == null ? "∞" : m.profitFactor.toFixed(2), ""],
     ["Gewinnrate", pct(m.winRate), "gold"],
     ["ROI%", "–", ""],
@@ -116,11 +126,11 @@ function renderStats(d, trades) {
     ["Ø Potential diff Ticks", "–", ""],
   ]);
   statRows("statDetails", [
-    ["Ø Ticks win", "–", ""],
-    ["Ø Ticks loss", "–", ""],
-    ["Max Win $/Ticks", `${moneyEur(maxWin)} / –`, "pos"],
-    ["Max Loss $/Ticks", `${moneyEur(maxLoss)} / –`, "neg"],
-    ["Ø PnL $/Ticks", `${moneyEur(avgNet)} / –`, cls(avgNet)],
+    ["Ø Ticks win", avgTk(winTrades), "pos"],
+    ["Ø Ticks loss", avgTk(lossTrades), "neg"],
+    ["Max Win $/Ticks", `${moneyEur(maxWin)} / ${tk(maxWinT)}`, "pos"],
+    ["Max Loss $/Ticks", `${moneyEur(maxLoss)} / ${tk(maxLossT)}`, "neg"],
+    ["Ø PnL $/Ticks", `${moneyEur(avgNet)} / ${avgTk(trades)}`, cls(avgNet)],
   ]);
 }
 
@@ -157,7 +167,7 @@ function labelChips(labels) {
 
 function tradeRow(t) {
   const n = net(t);
-  const pts = points(t);
+  const tk = tradeTicks(t);
   return `<div class="trade-row ${n >= 0 ? "win" : "loss"}" onclick="location.href='trade.html?id=${t.id}'">
     <input type="checkbox" class="tcheck" onclick="event.stopPropagation()" />
     <div class="tcol rating">${stars(t.rating)}
@@ -167,7 +177,7 @@ function tradeRow(t) {
     </div>
     <div class="tcol tpnl">
       <div class="${cls(n)}">${moneyEur(n)}</div>
-      <div class="tsub ${cls(pts ?? 0)}">${pts == null ? "–" : pts + " pts"}</div>
+      <div class="tsub ${cls(tk ?? 0)}">${tk == null ? "–" : tk + " Ticks"}</div>
     </div>
     <div class="tcol"><div class="tlabel">OPEN</div><div class="tval">${tradeTime(t.open_time)}</div><div class="tprice">${priceDe(t.open_price)}</div></div>
     <div class="tcol"><div class="tlabel">CLOSE</div><div class="tval">${tradeTime(t.close_time)}</div><div class="tprice">${priceDe(t.close_price)}</div></div>
