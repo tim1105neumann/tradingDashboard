@@ -12,9 +12,22 @@ let pnlChart = null;
 let allTrades = [];
 let page = 0;
 const PER_PAGE = 10;
+let sortKey = "time";
+let sortDir = "desc";
+
+function cmp(a, b) {
+  let av, bv;
+  if (sortKey === "contracts") { av = a.volume; bv = b.volume; }
+  else if (sortKey === "account") { av = (a.account || "").toLowerCase(); bv = (b.account || "").toLowerCase(); }
+  else { av = a.close_time || ""; bv = b.close_time || ""; }
+  return av < bv ? -1 : av > bv ? 1 : 0;
+}
+function sortTrades() {
+  const d = sortDir === "asc" ? 1 : -1;
+  allTrades.sort((a, b) => d * cmp(a, b));
+}
 
 const net = (t) => t.pnl - t.commission;
-const priceDe = (n) => n == null ? "–" : n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 function tradeTime(iso) {
   if (!iso) return "–";
@@ -47,7 +60,8 @@ async function refresh() {
       fetch("/api/analytics").then((r) => r.json()),
       fetch("/api/trades").then((r) => r.json()),
     ]);
-    allTrades = trades.slice().sort((a, b) => (a.close_time < b.close_time ? 1 : -1));
+    allTrades = trades.slice();
+    sortTrades();
     renderStats(d, trades);
     renderPnlChart(d.byDay);
     renderTrades();
@@ -160,9 +174,9 @@ function renderPnlChart(byDay) {
 function stars(rating) {
   return `<span class="stars">${[1, 2, 3, 4, 5].map((i) => (i <= rating ? "★" : "☆")).join("")}</span>`;
 }
-function labelChips(labels) {
-  if (!labels || !labels.length) return "";
-  return `<div class="row-labels">${labels.map((l) => `<span class="label-chip sm">${l}</span>`).join("")}</div>`;
+function labelBox(labels) {
+  const chips = (labels || []).map((l) => `<span class="label-chip sm">${l}</span>`).join("");
+  return `<div class="label-square">${chips || '<span class="label-empty">Keine Labels</span>'}</div>`;
 }
 
 function tradeRow(t) {
@@ -173,14 +187,12 @@ function tradeRow(t) {
     <div class="tcol rating">${stars(t.rating)}
       <div class="tsym">${t.symbol}</div>
       <span class="pill ${t.direction}">${t.direction}</span>
-      ${labelChips(t.labels)}
     </div>
     <div class="tcol tpnl">
       <div class="${cls(n)}">${moneyEur(n)}</div>
       <div class="tsub ${cls(tk ?? 0)}">${tk == null ? "–" : tk + " Ticks"}</div>
     </div>
-    <div class="tcol"><div class="tlabel">OPEN</div><div class="tval">${tradeTime(t.open_time)}</div><div class="tprice">${priceDe(t.open_price)}</div></div>
-    <div class="tcol"><div class="tlabel">CLOSE</div><div class="tval">${tradeTime(t.close_time)}</div><div class="tprice">${priceDe(t.close_price)}</div></div>
+    ${labelBox(t.labels)}
     <div class="tcol"><div class="tlabel">SIZE</div><div class="tval">${t.volume} Contracts</div></div>
     <div class="tcol"><div class="tlabel">DURATION</div><div class="tval">${fmtDur(durSec(t))}</div></div>
     <div class="tcol"><div class="tlabel">ACCOUNT</div><div class="tval">${t.account || "–"}</div></div>
@@ -204,6 +216,20 @@ function renderTrades() {
 document.getElementById("prevPage").onclick = () => { if (page > 0) { page--; renderTrades(); } };
 document.getElementById("nextPage").onclick = () => {
   if ((page + 1) * PER_PAGE < allTrades.length) { page++; renderTrades(); }
+};
+
+document.getElementById("sortBy").onchange = (e) => {
+  sortKey = e.target.value;
+  page = 0;
+  sortTrades();
+  renderTrades();
+};
+document.getElementById("sortDir").onclick = () => {
+  sortDir = sortDir === "asc" ? "desc" : "asc";
+  document.getElementById("sortDir").textContent = sortDir === "asc" ? "↑" : "↓";
+  page = 0;
+  sortTrades();
+  renderTrades();
 };
 
 refresh();

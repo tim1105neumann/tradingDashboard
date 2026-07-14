@@ -56,10 +56,14 @@
       <span class="filter-chip">Labels ▾</span>
       <span class="filter-chip">LOS</span>
       <span class="filter-spacer"></span>
-      <span class="filter-chip">Sort by ▾</span>
-      <span class="ico">↓</span>
-      <span class="filter-chip gold">TRADE HINZUFÜGEN</span>
-      <span class="filter-chip">EXPORTIEREN</span>
+      <label class="sort-label">Sort by
+        <select id="sortBy" class="sort-select">
+          <option value="time">Zeit</option>
+          <option value="contracts">Kontrakte</option>
+          <option value="account">Konto</option>
+        </select>
+      </label>
+      <span class="ico sort-dir" id="sortDir" title="Sortierrichtung">↓</span>
     </div>
 
     <section id="tradeList" class="trade-list"></section>

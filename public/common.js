@@ -28,11 +28,7 @@ const NAV = [
   { key: "plan", label: "Trading-Plan", ico: "▢", href: "#" },
   { key: "community", label: "Community", ico: "◍", href: "#" },
   { key: "import", label: "Import", ico: "⇩", href: "#" },
-  { key: "werkzeuge", label: "Werkzeuge", ico: "▣", href: "#" },
   { key: "konten", label: "Konten", ico: "▥", href: "#" },
-  { key: "hilfe", label: "Hilfe", ico: "?", href: "#" },
-  { key: "profil", label: "Benutzerprofil", ico: "◑", href: "#" },
-  { key: "abmelden", label: "Abmelden", ico: "⏻", href: "#" },
 ];
 
 function renderSidebar(active) {
