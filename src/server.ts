@@ -1,7 +1,7 @@
 import express from "express";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { getTrades, insertTrade } from "./db.js";
+import { getTradeById, getTrades, insertTrade, updateNote } from "./db.js";
 import { NormalizeError, normalizeAtasTrade } from "./normalize.js";
 import { computeAnalytics, computeMetrics } from "./metrics.js";
 
@@ -45,6 +45,18 @@ app.get("/api/metrics", (_req, res) => {
 app.get("/api/analytics", (_req, res) => {
   const trades = getTrades();
   res.json({ metrics: computeMetrics(trades), ...computeAnalytics(trades) });
+});
+
+app.get("/api/trades/:id", (req, res) => {
+  const trade = getTradeById(Number(req.params.id));
+  if (!trade) return res.status(404).json({ error: "not found" });
+  res.json(trade);
+});
+
+app.put("/api/trades/:id/note", (req, res) => {
+  const ok = updateNote(Number(req.params.id), String(req.body?.note ?? ""));
+  if (!ok) return res.status(404).json({ error: "not found" });
+  res.json({ status: "saved" });
 });
 
 // --- Static dashboard UI ---

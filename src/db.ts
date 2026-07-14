@@ -72,3 +72,12 @@ export function getTrades(): Trade[] {
     .prepare("SELECT * FROM trades ORDER BY close_time ASC, id ASC")
     .all() as unknown as Trade[];
 }
+
+export function getTradeById(id: number): Trade | undefined {
+  return db.prepare("SELECT * FROM trades WHERE id = ?").get(id) as unknown as Trade | undefined;
+}
+
+export function updateNote(id: number, note: string): boolean {
+  const info = db.prepare("UPDATE trades SET comment = ? WHERE id = ?").run(note, id);
+  return info.changes > 0;
+}

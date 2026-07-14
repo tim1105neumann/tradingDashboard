@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trade · Trading Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="main">
+    <div class="detail-top">
+      <span class="stars big">☆☆☆☆☆</span>
+      <a class="back" href="journal.html">‹ Zurück</a>
+      <span class="ico">⤴</span>
+    </div>
+
+    <!-- Trade summary -->
+    <div class="period-label"><span class="ico gold">▤</span> Trade-Zusammenfassung</div>
+    <section class="card summary-card" id="summary"></section>
+
+    <div class="detail-grid">
+      <!-- Statistics -->
+      <div>
+        <div class="period-label"><span class="ico gold">▦</span> Statistiken</div>
+        <section class="card" id="stats"></section>
+      </div>
+
+      <!-- Documentation + chart -->
+      <div>
+        <div class="period-label"><span class="ico gold">✎</span> Documentation</div>
+        <section class="card">
+          <textarea id="notes" class="notes" placeholder="Enter your notes here..."></textarea>
+          <div class="note-status" id="noteStatus"></div>
+        </section>
+        <div class="period-label"><span class="ico gold">📈</span> Chart</div>
+        <section class="card chart-placeholder">
+          <div class="ph-icon">📈</div>
+          <div class="ph-title">Chart Data Not Available Yet</div>
+          <div class="ph-sub">Marktdaten werden vom ATAS-Export nicht mitgeliefert.</div>
+        </section>
+      </div>
+    </div>
+
+    <!-- Unrealized P&L / Screenshots / Strategies -->
+    <div class="detail-row3">
+      <div>
+        <div class="period-label"><span class="ico gold">📉</span> Unrealisierte P&L</div>
+        <section class="card"><div class="chart" style="height:180px"><canvas id="uplChart"></canvas></div>
+          <div class="ph-sub" id="uplNote"></div></section>
+      </div>
+      <div>
+        <div class="period-label"><span class="ico gold">▧</span> Strategien</div>
+        <section class="card center-card">
+          <div class="ph-icon">💡</div>
+          <div class="ph-sub">Noch keine Strategien erstellt</div>
+        </section>
+      </div>
+    </div>
+
+    <!-- Fills / Orders -->
+    <div class="detail-row2">
+      <div>
+        <div class="period-label"><span class="ico gold">▤</span> Trades</div>
+        <section class="card"><table class="mini-table" id="fills"></table></section>
+      </div>
+      <div>
+        <div class="period-label"><span class="ico gold">▤</span> Orders</div>
+        <section class="card"><table class="mini-table" id="orders"></table></section>
+      </div>
+    </div>
+  </main>
+
+  <script src="vendor/chart.umd.js"></script>
+  <script src="common.js"></script>
+  <script src="trade.js"></script>
+</body>
+</html>

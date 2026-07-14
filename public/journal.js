@@ -154,8 +154,8 @@ function stars() {
 function tradeRow(t) {
   const n = net(t);
   const pts = points(t);
-  return `<div class="trade-row ${n >= 0 ? "win" : "loss"}">
-    <input type="checkbox" class="tcheck" />
+  return `<div class="trade-row ${n >= 0 ? "win" : "loss"}" onclick="location.href='trade.html?id=${t.id}'">
+    <input type="checkbox" class="tcheck" onclick="event.stopPropagation()" />
     <div class="tcol rating">${stars()}
       <div class="tsym">${t.symbol}</div>
       <span class="pill ${t.direction}">${t.direction}</span>

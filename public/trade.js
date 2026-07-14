@@ -1,0 +1,162 @@
+renderSidebar("journal");
+
+Chart.defaults.color = "#7d8898";
+Chart.defaults.animation = false;
+Chart.defaults.maintainAspectRatio = false;
+Chart.defaults.plugins.legend.display = false;
+
+const id = new URLSearchParams(location.search).get("id");
+const net = (t) => t.pnl - t.commission;
+const priceDe = (n) => (n == null ? "–" : n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+function fullTime(iso) {
+  if (!iso) return "–";
+  const d = iso.slice(8, 10), mo = iso.slice(5, 7), y = iso.slice(0, 4);
+  return `${d}.${mo}.${y} ${iso.slice(11, 19) || iso.slice(11, 16)}`;
+}
+function durSec(t) {
+  if (!t.open_time || !t.close_time) return null;
+  const s = (new Date(t.close_time) - new Date(t.open_time)) / 1000;
+  return Number.isFinite(s) && s >= 0 ? s : null;
+}
+function fmtDur(sec) {
+  if (sec == null) return "–";
+  sec = Math.round(sec);
+  if (sec < 60) return sec + "s";
+  const m = Math.floor(sec / 60);
+  return m < 60 ? `${m}m ${sec % 60}s` : `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+function points(t) {
+  if (t.open_price == null || t.close_price == null) return null;
+  const d = t.direction === "short" ? t.open_price - t.close_price : t.close_price - t.open_price;
+  return Math.round(d * 100) / 100;
+}
+
+async function load() {
+  let t;
+  try {
+    const r = await fetch(`/api/trades/${id}`);
+    if (!r.ok) throw new Error();
+    t = await r.json();
+  } catch {
+    document.getElementById("summary").innerHTML = `<div class="empty">Trade nicht gefunden.</div>`;
+    return;
+  }
+  renderSummary(t);
+  renderStats(t);
+  renderFillsOrders(t);
+  renderUpl(t);
+  setupNotes(t);
+}
+
+function renderSummary(t) {
+  const n = net(t);
+  const pts = points(t);
+  document.getElementById("summary").innerHTML = `
+    <div class="sum-head">
+      <div class="sum-sym"><span class="tsym">${t.symbol}</span><span class="pill ${t.direction}">${t.direction}</span></div>
+      <div class="sum-meta">
+        <div><span class="tlabel">SIZE</span><div>${t.volume} Contracts</div></div>
+        <div><span class="tlabel">DAUER</span><div>${fmtDur(durSec(t))}</div></div>
+        <div><span class="tlabel">GEBÜHREN</span><div>${moneyEur(t.commission)}</div></div>
+        <div><span class="tlabel">KONTO</span><div>${t.account || "–"}</div></div>
+      </div>
+    </div>
+    <div class="sum-body">
+      <div class="sum-pnl">
+        <div class="big-pnl ${cls(n)}">${moneyEur(n)}</div>
+        <div class="sum-ticks"><span class="tlabel">DURCHSCHN. TICKS</span> <b>${pts ?? "–"}</b> &nbsp; <span class="tlabel">TICKS</span> <b>${pts ?? "–"}</b></div>
+      </div>
+      <div class="sum-times">
+        <div><span class="tlabel">ERÖFFNUNG</span><div class="gold">${fullTime(t.open_time)}</div><div class="tprice">${priceDe(t.open_price)}</div></div>
+        <div><span class="tlabel">SCHLIESSUNG</span><div class="gold">${fullTime(t.close_time)}</div><div class="tprice">${priceDe(t.close_price)}</div></div>
+      </div>
+    </div>`;
+}
+
+function statBox(label, value, cl) {
+  return `<div class="stat-box"><span class="tlabel">${label}</span><div class="${cl || ""}">${value}</div></div>`;
+}
+
+function renderStats(t) {
+  const n = net(t);
+  const pts = points(t);
+  document.getElementById("stats").innerHTML = `
+    <div class="stat-section">MANAGEMENT</div>
+    <div class="stat-grid">
+      ${statBox("TAKE PROFIT", n > 0 ? moneyEur(n) : "–", "pos")}
+      ${statBox("STOP LOSS", n < 0 ? moneyEur(n) : "–", "neg")}
+      ${statBox("TP TICKS", pts != null && pts > 0 ? pts : "–")}
+      ${statBox("SL TICKS", pts != null && pts < 0 ? pts : "–")}
+      ${statBox("POTENTIAL", "–")}
+      ${statBox("SL BENÖTIGT", "–")}
+    </div>
+    <div class="stat-section">PERFORMANCE</div>
+    <div class="stat-grid">
+      ${statBox("CRV", "–")}
+      ${statBox("REAL CRV", "–")}
+      ${statBox("ROI", "–")}
+    </div>`;
+}
+
+function renderFillsOrders(t) {
+  // Reconstruct the two fills (entry + exit) from the aggregated trade.
+  const entrySide = t.direction === "short" ? "SELL" : "BUY";
+  const exitSide = t.direction === "short" ? "BUY" : "SELL";
+  const sideCls = (s) => (s === "BUY" ? "pos" : "neg");
+  document.getElementById("fills").innerHTML = `
+    <tr class="mt-head"><th>RICHTUNG</th><th>QTY</th><th>ZEIT</th><th class="num">PREIS</th></tr>
+    <tr><td class="${sideCls(entrySide)}">${entrySide}</td><td>${t.volume}</td><td>${fullTime(t.open_time)}</td><td class="num">${priceDe(t.open_price)}</td></tr>
+    <tr><td class="${sideCls(exitSide)}">${exitSide}</td><td>${t.volume}</td><td>${fullTime(t.close_time)}</td><td class="num">${priceDe(t.close_price)}</td></tr>`;
+  document.getElementById("orders").innerHTML = `
+    <tr class="mt-head"><th>AUSGEFÜHRT</th><th>TYP</th><th>ZEIT</th><th>RICHTUNG</th><th class="num">PREIS</th></tr>
+    <tr><td class="dot-cell"><i class="dot green"></i></td><td>MARKET</td><td>${fullTime(t.open_time)}</td><td class="${sideCls(entrySide)}">${entrySide}</td><td class="num">${priceDe(t.open_price)}</td></tr>
+    <tr><td class="dot-cell"><i class="dot green"></i></td><td>MARKET</td><td>${fullTime(t.close_time)}</td><td class="${sideCls(exitSide)}">${exitSide}</td><td class="num">${priceDe(t.close_price)}</td></tr>`;
+}
+
+function renderUpl(t) {
+  // We only have the final realized P&L, not the intra-trade path, so we draw a
+  // simple 0 -> final line and say so.
+  const n = net(t);
+  document.getElementById("uplNote").textContent =
+    "Nur Start/Ende bekannt — der ATAS-Export liefert keinen Intra-Trade-Verlauf.";
+  new Chart(document.getElementById("uplChart").getContext("2d"), {
+    type: "line",
+    data: {
+      labels: ["Open", "Close"],
+      datasets: [{ data: [0, n], borderColor: GOLD, borderWidth: 2, pointRadius: 3, tension: 0 }],
+    },
+    options: {
+      plugins: { tooltip: { callbacks: { label: (c) => moneyEur(c.parsed.y) } } },
+      scales: { x: { grid: { display: false } }, y: { grid: { color: "rgba(255,255,255,0.04)" } } },
+    },
+  });
+}
+
+function setupNotes(t) {
+  const ta = document.getElementById("notes");
+  const st = document.getElementById("noteStatus");
+  ta.value = t.comment || "";
+  let timer;
+  const save = async () => {
+    st.textContent = "speichert…";
+    try {
+      await fetch(`/api/trades/${id}/note`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: ta.value }),
+      });
+      st.textContent = "gespeichert ✓";
+    } catch {
+      st.textContent = "Fehler beim Speichern";
+    }
+  };
+  ta.addEventListener("input", () => {
+    clearTimeout(timer);
+    st.textContent = "";
+    timer = setTimeout(save, 700);
+  });
+  ta.addEventListener("blur", save);
+}
+
+load();
