@@ -32,6 +32,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_trades_symbol ON trades(symbol);
 `);
 
+db.exec(`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
+
 // Migration: add columns that older databases don't have yet.
 const cols = new Set((db.prepare("PRAGMA table_info(trades)").all() as { name: string }[]).map((c) => c.name));
 if (!cols.has("rating")) db.exec("ALTER TABLE trades ADD COLUMN rating INTEGER NOT NULL DEFAULT 0");
@@ -59,10 +61,10 @@ export interface Trade {
 
 export type NewTrade = Omit<Trade, "id" | "received_at" | "rating" | "labels">;
 
-// ATAS timestamps arrive an hour behind this user's local time. Shift on read so
-// all views (hour buckets, detail page, calendar) show the correct local time.
-// Change the default (or set TZ_OFFSET_HOURS env var) if your offset differs.
-const TZ_OFFSET_HOURS = Number(process.env.TZ_OFFSET_HOURS ?? 1);
+// ATAS sends timestamps in UTC; this user is UTC+2 (Central European summer time),
+// so shift on read. All views (hour buckets, detail page, calendar) then show local
+// time. Change the default (or set TZ_OFFSET_HOURS env var) if your offset differs.
+const TZ_OFFSET_HOURS = Number(process.env.TZ_OFFSET_HOURS ?? 2);
 
 function shiftIso(iso: string | null, hours: number): string | null {
   if (!iso || hours === 0) return iso;
@@ -133,4 +135,13 @@ export function updateLabels(id: number, labels: string[]): boolean {
   const clean = labels.map((l) => String(l).trim()).filter(Boolean).slice(0, 20);
   const info = db.prepare("UPDATE trades SET labels = ? WHERE id = ?").run(JSON.stringify(clean), id);
   return info.changes > 0;
+}
+
+export function getSetting(key: string): string | null {
+  const row = db.prepare("SELECT value FROM app_settings WHERE key = ?").get(key) as { value: string } | undefined;
+  return row ? row.value : null;
+}
+
+export function setSetting(key: string, value: string): void {
+  db.prepare("INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, value);
 }

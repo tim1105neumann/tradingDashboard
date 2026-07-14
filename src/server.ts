@@ -1,7 +1,7 @@
 import express from "express";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { getTradeById, getTrades, insertTrade, updateLabels, updateNote, updateRating } from "./db.js";
+import { getSetting, getTradeById, getTrades, insertTrade, setSetting, updateLabels, updateNote, updateRating } from "./db.js";
 import { NormalizeError, normalizeAtasTrade } from "./normalize.js";
 import { computeAnalytics, computeMetrics } from "./metrics.js";
 
@@ -31,6 +31,24 @@ app.post("/webhook/atas", (req, res) => {
     console.error("[webhook] unexpected error", err);
     res.status(500).json({ status: "error" });
   }
+});
+
+// --- Tag settings (categories + predefined tags) ---
+app.get("/api/settings/tags", (_req, res) => {
+  const v = getSetting("tagCategories");
+  res.json(v ? JSON.parse(v) : []);
+});
+
+app.put("/api/settings/tags", (req, res) => {
+  const input = Array.isArray(req.body?.categories) ? req.body.categories : [];
+  const clean = input
+    .map((c: { name?: unknown; tags?: unknown }) => ({
+      name: String(c?.name ?? "").trim(),
+      tags: Array.isArray(c?.tags) ? [...new Set(c.tags.map((t) => String(t).trim()).filter(Boolean))] : [],
+    }))
+    .filter((c: { name: string }) => c.name);
+  setSetting("tagCategories", JSON.stringify(clean));
+  res.json({ status: "saved" });
 });
 
 // --- Dashboard data API ---

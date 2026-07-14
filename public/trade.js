@@ -6,6 +6,7 @@ Chart.defaults.maintainAspectRatio = false;
 Chart.defaults.plugins.legend.display = false;
 
 const id = new URLSearchParams(location.search).get("id");
+let tagCats = [];
 const net = (t) => t.pnl - t.commission;
 const priceDe = (n) => (n == null ? "–" : n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
@@ -37,6 +38,7 @@ async function load() {
     document.getElementById("summary").innerHTML = `<div class="empty">Trade nicht gefunden.</div>`;
     return;
   }
+  tagCats = await fetchTagCategories();
   renderSummary(t);
   renderStars(t);
   renderLabels(t);
@@ -99,6 +101,36 @@ function renderLabels(t) {
   };
   document.getElementById("labelPlus").onclick = add;
   input.onkeydown = (e) => { if (e.key === "Enter") add(); };
+
+  renderTagPicker(t);
+}
+
+function renderTagPicker(t) {
+  const picker = document.getElementById("tagPicker");
+  if (!picker) return;
+  const groups = tagCats
+    .filter((c) => (c.tags || []).length)
+    .map((c) => {
+      const avail = c.tags.filter((tag) => !t.labels.includes(tag));
+      const chips = avail.length
+        ? avail.map((tag) => `<span class="pick-tag" data-tag="${escapeHtml(tag)}">＋ ${escapeHtml(tag)}</span>`).join("")
+        : `<span class="picker-empty">alle hinzugefügt</span>`;
+      return `<div class="picker-cat"><span class="picker-cat-name">${escapeHtml(c.name)}</span>${chips}</div>`;
+    })
+    .join("");
+  picker.innerHTML = groups
+    ? `<div class="picker-title">Tags hinzufügen</div>${groups}`
+    : `<div class="picker-hint">Noch keine Tags definiert — lege welche unter <a href="settings.html">Einstellungen</a> an.</div>`;
+  picker.querySelectorAll(".pick-tag").forEach((el) => {
+    el.onclick = async () => {
+      const tag = el.dataset.tag;
+      if (!t.labels.includes(tag)) {
+        t.labels.push(tag);
+        renderLabels(t);
+        await save("labels", { labels: t.labels });
+      }
+    };
+  });
 }
 
 function escapeHtml(s) {
@@ -128,7 +160,8 @@ function renderSummary(t) {
         <div><span class="tlabel">SCHLIESSUNG</span><div class="gold">${fullTime(t.close_time)}</div><div class="tprice">${priceDe(t.close_price)}</div></div>
       </div>
     </div>
-    <div class="label-bar" id="labelBar"></div>`;
+    <div class="label-bar" id="labelBar"></div>
+    <div class="tag-picker" id="tagPicker"></div>`;
 }
 
 function statBox(label, value, cl) {

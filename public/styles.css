@@ -226,6 +226,30 @@ body {
 .label-chip.sm { padding: 1px 6px; font-size: 9.5px; }
 .label-chip .x { cursor: pointer; color: #f2c9a0; opacity: .7; font-style: normal; font-size: 10px; }
 .label-chip .x:hover { opacity: 1; }
+/* settings: tag categories */
+.settings-hint { color: var(--muted); font-size: 13px; max-width: 720px; line-height: 1.5; margin: 0 2px 18px; }
+.cat-list { display: flex; flex-direction: column; gap: 14px; }
+.cat-card { padding: 16px 18px; }
+.cat-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.cat-name { flex: 1; background: var(--card-2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; font-weight: 600; padding: 8px 10px; }
+.cat-del { cursor: pointer; color: var(--muted); font-size: 14px; }
+.cat-del:hover { color: var(--red); }
+.cat-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.tag-input { background: transparent; border: none; outline: none; color: var(--text); font-size: 12px; width: 90px; padding: 3px; }
+.btn-add { margin-top: 16px; background: rgba(233,179,8,.08); color: var(--gold); border: 1px solid rgba(233,179,8,.4); border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn-add:hover { background: rgba(233,179,8,.14); }
+
+/* trade detail: tag picker */
+.tag-picker { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px; }
+.picker-title { font-size: 11px; color: var(--muted-2); letter-spacing: .05em; margin-bottom: 10px; }
+.picker-cat { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+.picker-cat-name { font-size: 11px; color: var(--muted); min-width: 96px; }
+.pick-tag { cursor: pointer; font-size: 12px; color: var(--muted); background: var(--card-2); border: 1px dashed var(--border); border-radius: 6px; padding: 4px 9px; }
+.pick-tag:hover { color: var(--gold); border-color: rgba(233,179,8,.5); }
+.picker-empty { font-size: 11px; color: var(--muted-2); }
+.picker-hint { font-size: 12px; color: var(--muted); }
+.picker-hint a { color: var(--gold); }
+
 .label-add { display: inline-flex; align-items: center; gap: 4px; background: var(--card-2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; }
 .label-add input { background: transparent; border: none; outline: none; color: var(--text); font-size: 12px; width: 110px; padding: 3px; }
 .label-add .plus { cursor: pointer; color: var(--muted); font-style: normal; }

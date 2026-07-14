@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Einstellungen · Trading Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="main">
+    <header class="topbar">
+      <h1><span class="ico gold">⚙</span> Einstellungen</h1>
+      <span class="status" id="status"></span>
+    </header>
+
+    <div class="period-label"><span class="ico gold">▤</span> TAG-KATEGORIEN</div>
+    <p class="settings-hint">
+      Definiere Kategorien und die dazugehörigen Tags. Diese kannst du dann per Klick zu
+      jedem Trade hinzufügen. Eigene, freie Tags kannst du im Trade weiterhin tippen —
+      sie werden hier nicht gespeichert.
+    </p>
+
+    <section id="catList" class="cat-list"></section>
+    <button class="btn-add" id="addCat">＋ Kategorie hinzufügen</button>
+  </main>
+
+  <script src="common.js"></script>
+  <script src="settings.js"></script>
+</body>
+</html>

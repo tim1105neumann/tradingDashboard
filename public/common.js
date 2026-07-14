@@ -29,7 +29,13 @@ const NAV = [
   { key: "community", label: "Community", ico: "◍", href: "#" },
   { key: "import", label: "Import", ico: "⇩", href: "#" },
   { key: "konten", label: "Konten", ico: "▥", href: "#" },
+  { key: "settings", label: "Einstellungen", ico: "⚙", href: "settings.html" },
 ];
+
+async function fetchTagCategories() {
+  try { return await fetch("/api/settings/tags").then((r) => r.json()); }
+  catch { return []; }
+}
 
 function renderSidebar(active) {
   const items = NAV.map(
