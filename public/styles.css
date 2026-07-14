@@ -197,6 +197,26 @@ body {
 .stars.big { color: var(--gold); font-size: 20px; letter-spacing: 3px; }
 .detail-top .back { margin: 0 auto; color: var(--muted); text-decoration: none; font-size: 14px; }
 .detail-top .back:hover { color: var(--text); }
+.stars.big .star { cursor: pointer; transition: transform .1s; }
+.stars.big .star:hover { transform: scale(1.15); }
+.stars.big .star.on { color: var(--gold); }
+.stars.big .star:not(.on) { color: var(--muted-2); }
+
+/* labels */
+.label-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.label-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #7c3a12; color: #f2c9a0; border-radius: 6px;
+  padding: 4px 9px; font-size: 12px; font-weight: 600;
+}
+.label-chip.sm { padding: 1px 6px; font-size: 9.5px; }
+.label-chip .x { cursor: pointer; color: #f2c9a0; opacity: .7; font-style: normal; font-size: 10px; }
+.label-chip .x:hover { opacity: 1; }
+.label-add { display: inline-flex; align-items: center; gap: 4px; background: var(--card-2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; }
+.label-add input { background: transparent; border: none; outline: none; color: var(--text); font-size: 12px; width: 110px; padding: 3px; }
+.label-add .plus { cursor: pointer; color: var(--muted); font-style: normal; }
+.label-add .plus:hover { color: var(--gold); }
+.row-labels { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
 
 .summary-card { background: linear-gradient(180deg, #10201a, var(--card)); }
 .sum-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 14px; border-bottom: 1px solid var(--border); }

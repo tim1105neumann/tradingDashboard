@@ -1,7 +1,7 @@
 import express from "express";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { getTradeById, getTrades, insertTrade, updateNote } from "./db.js";
+import { getTradeById, getTrades, insertTrade, updateLabels, updateNote, updateRating } from "./db.js";
 import { NormalizeError, normalizeAtasTrade } from "./normalize.js";
 import { computeAnalytics, computeMetrics } from "./metrics.js";
 
@@ -55,6 +55,19 @@ app.get("/api/trades/:id", (req, res) => {
 
 app.put("/api/trades/:id/note", (req, res) => {
   const ok = updateNote(Number(req.params.id), String(req.body?.note ?? ""));
+  if (!ok) return res.status(404).json({ error: "not found" });
+  res.json({ status: "saved" });
+});
+
+app.put("/api/trades/:id/rating", (req, res) => {
+  const ok = updateRating(Number(req.params.id), Number(req.body?.rating ?? 0));
+  if (!ok) return res.status(404).json({ error: "not found" });
+  res.json({ status: "saved" });
+});
+
+app.put("/api/trades/:id/labels", (req, res) => {
+  const labels = Array.isArray(req.body?.labels) ? req.body.labels : [];
+  const ok = updateLabels(Number(req.params.id), labels);
   if (!ok) return res.status(404).json({ error: "not found" });
   res.json({ status: "saved" });
 });

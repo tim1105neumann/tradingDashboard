@@ -43,10 +43,71 @@ async function load() {
     return;
   }
   renderSummary(t);
+  renderStars(t);
+  renderLabels(t);
   renderStats(t);
   renderFillsOrders(t);
   renderUpl(t);
   setupNotes(t);
+}
+
+let current = null;
+
+async function save(path, body) {
+  await fetch(`/api/trades/${id}/${path}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+function renderStars(t) {
+  current = t;
+  const bar = document.getElementById("starBar");
+  bar.innerHTML = [1, 2, 3, 4, 5]
+    .map((i) => `<span class="star ${i <= t.rating ? "on" : ""}" data-v="${i}">${i <= t.rating ? "★" : "☆"}</span>`)
+    .join("");
+  bar.querySelectorAll(".star").forEach((el) => {
+    el.onclick = async () => {
+      const v = Number(el.dataset.v);
+      t.rating = v === t.rating ? 0 : v; // click active star again clears it
+      renderStars(t);
+      await save("rating", { rating: t.rating });
+    };
+  });
+}
+
+function renderLabels(t) {
+  const bar = document.getElementById("labelBar");
+  if (!bar) return;
+  const chips = t.labels
+    .map((l, i) => `<span class="label-chip">${escapeHtml(l)}<i class="x" data-i="${i}">✕</i></span>`)
+    .join("");
+  bar.innerHTML = chips +
+    `<span class="label-add"><input id="labelInput" placeholder="" /><i class="plus" id="labelPlus">＋</i></span>`;
+
+  bar.querySelectorAll(".x").forEach((el) => {
+    el.onclick = async () => {
+      t.labels.splice(Number(el.dataset.i), 1);
+      renderLabels(t);
+      await save("labels", { labels: t.labels });
+    };
+  });
+  const input = document.getElementById("labelInput");
+  const add = async () => {
+    const v = input.value.trim();
+    if (!v || t.labels.includes(v)) { input.value = ""; return; }
+    t.labels.push(v);
+    renderLabels(t);
+    document.getElementById("labelInput").focus();
+    await save("labels", { labels: t.labels });
+  };
+  document.getElementById("labelPlus").onclick = add;
+  input.onkeydown = (e) => { if (e.key === "Enter") add(); };
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
 function renderSummary(t) {
@@ -71,7 +132,8 @@ function renderSummary(t) {
         <div><span class="tlabel">ERÖFFNUNG</span><div class="gold">${fullTime(t.open_time)}</div><div class="tprice">${priceDe(t.open_price)}</div></div>
         <div><span class="tlabel">SCHLIESSUNG</span><div class="gold">${fullTime(t.close_time)}</div><div class="tprice">${priceDe(t.close_price)}</div></div>
       </div>
-    </div>`;
+    </div>
+    <div class="label-bar" id="labelBar"></div>`;
 }
 
 function statBox(label, value, cl) {

@@ -147,8 +147,12 @@ function renderPnlChart(byDay) {
   pnlChart = new Chart(document.getElementById("pnlChart").getContext("2d"), cfg);
 }
 
-function stars() {
-  return `<span class="stars">${"☆".repeat(5)}</span>`;
+function stars(rating) {
+  return `<span class="stars">${[1, 2, 3, 4, 5].map((i) => (i <= rating ? "★" : "☆")).join("")}</span>`;
+}
+function labelChips(labels) {
+  if (!labels || !labels.length) return "";
+  return `<div class="row-labels">${labels.map((l) => `<span class="label-chip sm">${l}</span>`).join("")}</div>`;
 }
 
 function tradeRow(t) {
@@ -156,9 +160,10 @@ function tradeRow(t) {
   const pts = points(t);
   return `<div class="trade-row ${n >= 0 ? "win" : "loss"}" onclick="location.href='trade.html?id=${t.id}'">
     <input type="checkbox" class="tcheck" onclick="event.stopPropagation()" />
-    <div class="tcol rating">${stars()}
+    <div class="tcol rating">${stars(t.rating)}
       <div class="tsym">${t.symbol}</div>
       <span class="pill ${t.direction}">${t.direction}</span>
+      ${labelChips(t.labels)}
     </div>
     <div class="tcol tpnl">
       <div class="${cls(n)}">${moneyEur(n)}</div>
