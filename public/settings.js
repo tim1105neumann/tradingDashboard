@@ -1,11 +1,8 @@
 renderSidebar("settings");
 
+const PALETTE = ["#e9b308", "#4c9bff", "#ff8038", "#a78bfa", "#22d3ee", "#f472b6", "#34d399"];
 let categories = [];
 let saveTimer;
-
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-}
 
 async function load() {
   categories = await fetchTagCategories();
@@ -30,6 +27,11 @@ function save() {
   }, 400);
 }
 
+function chip(c, t, ti) {
+  const col = c.color || "#e9b308";
+  return `<span class="label-chip colored" style="background:${col}22;color:${col};border:1px solid ${col}66">${escapeHtml(t)}<i class="x" data-ci="${c._i}" data-ti="${ti}">✕</i></span>`;
+}
+
 function render() {
   const list = document.getElementById("catList");
   if (!categories.length) {
@@ -37,26 +39,29 @@ function render() {
     return;
   }
   list.innerHTML = categories
-    .map(
-      (c, ci) => `
+    .map((c, ci) => {
+      c._i = ci;
+      return `
     <div class="card cat-card">
       <div class="cat-head">
+        <input type="color" class="cat-color" data-ci="${ci}" value="${c.color || "#e9b308"}" />
         <input class="cat-name" data-ci="${ci}" value="${escapeHtml(c.name)}" placeholder="Kategoriename" />
         <span class="cat-del" data-del="${ci}" title="Kategorie löschen">✕</span>
       </div>
       <div class="cat-tags">
-        ${c.tags
-          .map((t, ti) => `<span class="label-chip">${escapeHtml(t)}<i class="x" data-ci="${ci}" data-ti="${ti}">✕</i></span>`)
-          .join("")}
+        ${c.tags.map((t, ti) => chip(c, t, ti)).join("")}
         <span class="label-add"><input class="tag-input" data-ci="${ci}" placeholder="Tag…" /><i class="plus" data-addtag="${ci}">＋</i></span>
       </div>
-    </div>`
-    )
+    </div>`;
+    })
     .join("");
   wire();
 }
 
 function wire() {
+  document.querySelectorAll(".cat-color").forEach((el) => {
+    el.onchange = () => { categories[+el.dataset.ci].color = el.value; render(); save(); };
+  });
   document.querySelectorAll(".cat-name").forEach((el) => {
     el.onchange = () => { categories[+el.dataset.ci].name = el.value.trim(); save(); };
   });
@@ -79,7 +84,7 @@ function wire() {
 }
 
 document.getElementById("addCat").onclick = () => {
-  categories.push({ name: "Neue Kategorie", tags: [] });
+  categories.push({ name: "Neue Kategorie", color: PALETTE[categories.length % PALETTE.length], tags: [] });
   render();
   save();
 };

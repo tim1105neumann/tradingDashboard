@@ -37,6 +37,24 @@ async function fetchTagCategories() {
   catch { return []; }
 }
 
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+// Map each predefined tag -> its category color.
+function tagColorMap(cats) {
+  const m = {};
+  (cats || []).forEach((c) => (c.tags || []).forEach((t) => { m[t] = c.color || "#e9b308"; }));
+  return m;
+}
+
+// A tag chip; predefined tags get their category color, custom tags stay default.
+function tagChipHtml(label, colorMap, cls) {
+  const color = colorMap && colorMap[label];
+  const style = color ? ` style="background:${color}22;color:${color};border:1px solid ${color}66"` : "";
+  return `<span class="label-chip ${cls || ""}${color ? " colored" : ""}"${style}>${escapeHtml(label)}</span>`;
+}
+
 function renderSidebar(active) {
   const items = NAV.map(
     (n) =>

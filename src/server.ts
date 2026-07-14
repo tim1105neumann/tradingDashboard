@@ -41,9 +41,11 @@ app.get("/api/settings/tags", (_req, res) => {
 
 app.put("/api/settings/tags", (req, res) => {
   const input = Array.isArray(req.body?.categories) ? req.body.categories : [];
+  const isHex = (s: string) => /^#[0-9a-fA-F]{6}$/.test(s);
   const clean = input
-    .map((c: { name?: unknown; tags?: unknown }) => ({
+    .map((c: { name?: unknown; color?: unknown; tags?: unknown }) => ({
       name: String(c?.name ?? "").trim(),
+      color: isHex(String(c?.color ?? "")) ? String(c.color) : "#e9b308",
       tags: Array.isArray(c?.tags) ? [...new Set(c.tags.map((t) => String(t).trim()).filter(Boolean))] : [],
     }))
     .filter((c: { name: string }) => c.name);

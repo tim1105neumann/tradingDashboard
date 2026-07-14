@@ -77,8 +77,13 @@ function renderStars(t) {
 function renderLabels(t) {
   const bar = document.getElementById("labelBar");
   if (!bar) return;
+  const cm = tagColorMap(tagCats);
   const chips = t.labels
-    .map((l, i) => `<span class="label-chip">${escapeHtml(l)}<i class="x" data-i="${i}">✕</i></span>`)
+    .map((l, i) => {
+      const color = cm[l];
+      const style = color ? ` style="background:${color}22;color:${color};border:1px solid ${color}66"` : "";
+      return `<span class="label-chip${color ? " colored" : ""}"${style}>${escapeHtml(l)}<i class="x" data-i="${i}">✕</i></span>`;
+    })
     .join("");
   bar.innerHTML = chips +
     `<span class="label-add"><input id="labelInput" placeholder="" /><i class="plus" id="labelPlus">＋</i></span>`;
@@ -111,11 +116,12 @@ function renderTagPicker(t) {
   const groups = tagCats
     .filter((c) => (c.tags || []).length)
     .map((c) => {
+      const col = c.color || "#e9b308";
       const avail = c.tags.filter((tag) => !t.labels.includes(tag));
       const chips = avail.length
-        ? avail.map((tag) => `<span class="pick-tag" data-tag="${escapeHtml(tag)}">＋ ${escapeHtml(tag)}</span>`).join("")
+        ? avail.map((tag) => `<span class="pick-tag" data-tag="${escapeHtml(tag)}" style="color:${col};border:1px dashed ${col}88">＋ ${escapeHtml(tag)}</span>`).join("")
         : `<span class="picker-empty">alle hinzugefügt</span>`;
-      return `<div class="picker-cat"><span class="picker-cat-name">${escapeHtml(c.name)}</span>${chips}</div>`;
+      return `<div class="picker-cat"><span class="picker-cat-name" style="color:${col}">${escapeHtml(c.name)}</span>${chips}</div>`;
     })
     .join("");
   picker.innerHTML = groups

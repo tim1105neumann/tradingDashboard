@@ -15,6 +15,7 @@ const PER_PAGE = 10;
 let sortKey = "time";
 let sortDir = "desc";
 let contractFilter = "all";
+let tagColors = {};
 
 function cmp(a, b) {
   let av, bv;
@@ -70,10 +71,12 @@ const avgTicks = (arr) => {
 async function refresh() {
   const status = document.getElementById("status");
   try {
-    const [d, trades] = await Promise.all([
+    const [d, trades, cats] = await Promise.all([
       fetch("/api/analytics").then((r) => r.json()),
       fetch("/api/trades").then((r) => r.json()),
+      fetchTagCategories(),
     ]);
+    tagColors = tagColorMap(cats);
     allTrades = trades.slice();
     sortTrades();
     populateContractOptions();
@@ -190,7 +193,7 @@ function stars(rating) {
   return `<span class="stars">${[1, 2, 3, 4, 5].map((i) => (i <= rating ? "★" : "☆")).join("")}</span>`;
 }
 function labelBox(labels) {
-  const chips = (labels || []).map((l) => `<span class="label-chip sm">${l}</span>`).join("");
+  const chips = (labels || []).map((l) => tagChipHtml(l, tagColors, "sm")).join("");
   return `<div class="label-square">${chips || '<span class="label-empty">Keine Labels</span>'}</div>`;
 }
 
