@@ -64,7 +64,16 @@ function hydrate(row: Record<string, unknown>): Trade {
   let labels: string[] = [];
   try { labels = JSON.parse((row.labels as string) || "[]"); } catch { labels = []; }
   const trade = { ...(row as unknown as Trade), rating: Number(row.rating ?? 0), labels };
-  trade.symbol = resolveSymbol(trade.symbol).ticker; // long ATAS name -> clean ticker
+  const spec = resolveSymbol(trade.symbol);
+  trade.symbol = spec.ticker; // long ATAS name -> clean ticker
+
+  // For known instruments, derive P&L deterministically from price x contract spec.
+  // ATAS's reported RealizedPnL is unreliable across accounts/positions, so we override it.
+  if (spec.tickSize && spec.tickValue && trade.open_price != null && trade.close_price != null) {
+    const dir = trade.direction === "short" ? -1 : 1;
+    const ticks = Math.round(((trade.close_price - trade.open_price) * dir) / spec.tickSize);
+    trade.pnl = Math.round(ticks * spec.tickValue * trade.volume * 100) / 100;
+  }
   return trade;
 }
 
