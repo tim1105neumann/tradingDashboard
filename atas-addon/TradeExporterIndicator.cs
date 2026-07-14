@@ -40,6 +40,7 @@ namespace TradingDashboard
         private decimal _commission;   // accumulated commission for the round trip
         private DateTime _openTime;    // time of first entry fill
         private decimal _realizedBaseline; // ATAS realized PnL captured at last flat
+        private string _account = "";      // account/portfolio id of the current trade
 
         // Diagnostics are written to this file (open it and paste lines back to iterate).
         private static readonly string LogPath = Path.Combine(
@@ -65,8 +66,9 @@ namespace TradingDashboard
                 var time = myTrade.Time;
                 var comm = myTrade.Commission ?? 0m;
                 var symbol = myTrade.Security?.ToString() ?? "UNKNOWN";
+                _account = myTrade.AccountID ?? myTrade.Portfolio?.AccountID ?? "";
 
-                Log($"[export] fill {(isBuy ? "BUY" : "SELL")} {vol} @ {price} net(before)={_net}");
+                Log($"[export] fill {(isBuy ? "BUY" : "SELL")} {vol} @ {price} net(before)={_net} acct={_account}");
 
                 _commission += comm;
                 var dirSign = isBuy ? 1 : -1;
@@ -131,7 +133,7 @@ namespace TradingDashboard
 
             Log($"[export] TRADE {symbol} {side} vol={_exitVol} entry={avgEntry} exit={avgExit} pnl={pnl} comm={_commission}");
 
-            var json = BuildJson(symbol, side, _exitVol, avgEntry, avgExit, _openTime, closeTime, pnl, _commission);
+            var json = BuildJson(symbol, side, _exitVol, avgEntry, avgExit, _openTime, closeTime, pnl, _commission, _account);
             PostAsync(json);
         }
 
@@ -147,12 +149,13 @@ namespace TradingDashboard
 
         private static string BuildJson(string symbol, string side, decimal volume,
             decimal openPrice, decimal closePrice, DateTime openTime, DateTime closeTime,
-            decimal pnl, decimal commission)
+            decimal pnl, decimal commission, string account)
         {
             var ci = CultureInfo.InvariantCulture;
             var sb = new StringBuilder();
             sb.Append('{');
             sb.Append($"\"id\":\"{Guid.NewGuid():N}\",");
+            sb.Append($"\"account\":\"{Escape(account)}\",");
             sb.Append($"\"symbol\":\"{Escape(symbol)}\",");
             sb.Append($"\"side\":\"{side}\",");
             sb.Append($"\"volume\":{volume.ToString(ci)},");
