@@ -15,8 +15,9 @@ trade P&L. This add-on reads the real trade data from inside ATAS instead.
 
 ## Prerequisites (Windows, one time)
 
-1. **.NET 8 SDK** — https://dotnet.microsoft.com/download/dotnet/8.0
-   Verify: `dotnet --version` (should print 8.x).
+1. **.NET 10 SDK** — https://dotnet.microsoft.com/download/dotnet/10.0
+   (ATAS 8.0.14 is built on .NET 10, so the add-on must target it too.)
+   Verify: `dotnet --version` (should print 10.x).
 2. **ATAS installed** (you have 8.0.14).
 
 ## Build
@@ -31,7 +32,7 @@ trade P&L. This add-on reads the real trade data from inside ATAS instead.
    ```
    dotnet build -c Release
    ```
-   Output DLL: `bin\Release\net8.0-windows\TradingDashboard.TradeExporter.dll`
+   Output DLL: `bin\Release\net10.0-windows\TradingDashboard.TradeExporter.dll`
 
    > If the build complains about a missing assembly (e.g. the `LogWarn` logger lives
    > in a different DLL on your version), tell me the exact error — reference names vary
