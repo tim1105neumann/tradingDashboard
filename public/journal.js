@@ -14,17 +14,31 @@ let page = 0;
 const PER_PAGE = 10;
 let sortKey = "time";
 let sortDir = "desc";
+let contractFilter = "all";
 
 function cmp(a, b) {
   let av, bv;
-  if (sortKey === "contracts") { av = a.volume; bv = b.volume; }
-  else if (sortKey === "account") { av = (a.account || "").toLowerCase(); bv = (b.account || "").toLowerCase(); }
+  if (sortKey === "account") { av = (a.account || "").toLowerCase(); bv = (b.account || "").toLowerCase(); }
   else { av = a.close_time || ""; bv = b.close_time || ""; }
   return av < bv ? -1 : av > bv ? 1 : 0;
 }
 function sortTrades() {
   const d = sortDir === "asc" ? 1 : -1;
   allTrades.sort((a, b) => d * cmp(a, b));
+}
+// Trades shown after applying the contract-count filter.
+function viewTrades() {
+  return contractFilter === "all" ? allTrades : allTrades.filter((t) => t.volume === Number(contractFilter));
+}
+// Rebuild the contract dropdown from the distinct contract sizes in the data.
+function populateContractOptions() {
+  const sel = document.getElementById("contractFilter");
+  const sizes = [...new Set(allTrades.map((t) => t.volume))].sort((a, b) => a - b);
+  const opts = ['<option value="all">Alle</option>']
+    .concat(sizes.map((s) => `<option value="${s}">${s} Contract${s === 1 ? "" : "s"}</option>`));
+  sel.innerHTML = opts.join("");
+  sel.value = sizes.map(String).includes(contractFilter) ? contractFilter : "all";
+  contractFilter = sel.value;
 }
 
 const net = (t) => t.pnl - t.commission;
@@ -62,6 +76,7 @@ async function refresh() {
     ]);
     allTrades = trades.slice();
     sortTrades();
+    populateContractOptions();
     renderStats(d, trades);
     renderPnlChart(d.byDay);
     renderTrades();
@@ -201,21 +216,28 @@ function tradeRow(t) {
 }
 
 function renderTrades() {
-  const totalPages = Math.max(1, Math.ceil(allTrades.length / PER_PAGE));
+  const view = viewTrades();
+  const totalPages = Math.max(1, Math.ceil(view.length / PER_PAGE));
   if (page >= totalPages) page = totalPages - 1;
   const start = page * PER_PAGE;
-  const slice = allTrades.slice(start, start + PER_PAGE);
+  const slice = view.slice(start, start + PER_PAGE);
   document.getElementById("tradeList").innerHTML = slice.length
     ? slice.map(tradeRow).join("")
-    : `<div class="empty">Noch keine Trades — warte auf ATAS…</div>`;
-  const end = Math.min(start + PER_PAGE, allTrades.length);
+    : `<div class="empty">Keine Trades für diese Auswahl.</div>`;
+  const end = Math.min(start + PER_PAGE, view.length);
   document.getElementById("pageInfo").textContent =
-    allTrades.length ? `${start + 1} – ${end} von ${allTrades.length}` : "0 von 0";
+    view.length ? `${start + 1} – ${end} von ${view.length}` : "0 von 0";
 }
 
 document.getElementById("prevPage").onclick = () => { if (page > 0) { page--; renderTrades(); } };
 document.getElementById("nextPage").onclick = () => {
-  if ((page + 1) * PER_PAGE < allTrades.length) { page++; renderTrades(); }
+  if ((page + 1) * PER_PAGE < viewTrades().length) { page++; renderTrades(); }
+};
+
+document.getElementById("contractFilter").onchange = (e) => {
+  contractFilter = e.target.value;
+  page = 0;
+  renderTrades();
 };
 
 document.getElementById("sortBy").onchange = (e) => {

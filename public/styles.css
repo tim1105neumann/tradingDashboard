@@ -172,18 +172,19 @@ body {
 .trade-list { display: flex; flex-direction: column; gap: 8px; }
 .trade-row {
   display: grid;
-  grid-template-columns: 22px 130px 90px minmax(120px, 2fr) 1fr 0.8fr 1fr 30px;
+  grid-template-columns: 22px 130px 90px minmax(160px, 2.4fr) 1fr 0.8fr 1fr 30px;
   align-items: center; gap: 12px;
   background: var(--card); border: 1px solid var(--border);
   border-left-width: 4px; border-radius: 10px; padding: 12px 14px;
   cursor: pointer;
 }
 .label-square {
-  display: flex; flex-wrap: wrap; align-content: center; gap: 6px;
-  min-height: 52px; padding: 8px 10px;
-  background: var(--card-2); border: 1px solid var(--border); border-radius: 8px;
+  display: flex; flex-wrap: wrap; align-content: center; gap: 8px;
+  min-height: 72px; padding: 12px 14px;
+  background: var(--card-2); border: 1px solid var(--border); border-radius: 10px;
 }
-.label-empty { color: var(--muted-2); font-size: 11px; }
+.label-square .label-chip.sm { font-size: 12.5px; padding: 5px 11px; }
+.label-empty { color: var(--muted-2); font-size: 12px; }
 .trade-row:hover { background: var(--card-2); }
 .trade-row.win { border-left-color: var(--green); }
 .trade-row.loss { border-left-color: var(--red); }
