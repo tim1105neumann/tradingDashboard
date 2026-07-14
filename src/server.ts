@@ -13,6 +13,7 @@ app.use(express.json({ limit: "256kb" }));
 
 // --- Live sync: ATAS webhook receiver ---
 app.post("/webhook/atas", (req, res) => {
+  console.log("[webhook] RAW PAYLOAD >>>", JSON.stringify(req.body));
   try {
     const trade = normalizeAtasTrade(req.body ?? {});
     const id = insertTrade(trade);
