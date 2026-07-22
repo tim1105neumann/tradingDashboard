@@ -1,8 +1,8 @@
 import express from "express";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { getSetting, getTradeById, getTrades, insertTrade, setSetting, updateLabels, updateNote, updateRating, SCREENSHOTS_DIR } from "./db.js";
+import { createReadStream, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { getSetting, getTradeById, getTradeByExternalId, getTrades, insertTrade, setSetting, updateLabels, updateNote, updateRating, SCREENSHOTS_DIR, CHARTS_DIR } from "./db.js";
 import { NormalizeError, normalizeAtasTrade } from "./normalize.js";
 import { computeAnalytics, computeMetrics } from "./metrics.js";
 
@@ -10,6 +10,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 4000;
 
 mkdirSync(SCREENSHOTS_DIR, { recursive: true });
+mkdirSync(CHARTS_DIR, { recursive: true });
 
 const app = express();
 // Limit is generous because trades can carry a base64 screenshot spanning all monitors.
@@ -47,6 +48,37 @@ app.post("/webhook/atas", (req, res) => {
     console.error("[webhook] unexpected error", err);
     res.status(500).json({ status: "error" });
   }
+});
+
+// --- Live sync: delayed candle window for a trade's chart ---
+// The add-on sends this minutes after the trade closes, once post-exit ("future")
+// bars have formed. Correlated to the trade by external_id, stored as data/charts/<id>.json.
+app.post("/webhook/atas/chart", (req, res) => {
+  const externalId = typeof req.body?.external_id === "string" ? (req.body.external_id as string) : null;
+  const candles = Array.isArray(req.body?.candles) ? req.body.candles : null;
+  if (!externalId || !candles || candles.length === 0) {
+    return res.status(422).json({ status: "error", message: "external_id and non-empty candles required" });
+  }
+  const trade = getTradeByExternalId(externalId);
+  if (!trade) {
+    console.warn(`[chart] no trade for external_id=${externalId} (yet?)`);
+    return res.status(404).json({ status: "error", message: "trade not found" });
+  }
+  try {
+    writeFileSync(resolve(CHARTS_DIR, `${trade.id}.json`), JSON.stringify(req.body));
+    console.log(`[chart] stored chart for trade #${trade.id}: ${candles.length} candles, tp=${req.body?.tp} sl=${req.body?.sl}`);
+    res.status(201).json({ status: "stored", id: trade.id });
+  } catch (e) {
+    console.error(`[chart] failed to store chart for trade #${trade.id}`, e);
+    res.status(500).json({ status: "error" });
+  }
+});
+
+app.get("/api/trades/:id/chart", (req, res) => {
+  const file = resolve(CHARTS_DIR, `${Number(req.params.id)}.json`);
+  if (!existsSync(file)) return res.status(404).json({ error: "no chart" });
+  res.type("application/json");
+  createReadStream(file).pipe(res);
 });
 
 // --- Tag settings (categories + predefined tags) ---

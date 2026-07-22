@@ -43,7 +43,7 @@ async function load() {
   renderStars(t);
   renderLabels(t);
   renderStats(t);
-  renderScreenshot(t);
+  renderChart(t);
   renderFillsOrders(t);
   renderUpl(t);
   setupNotes(t);
@@ -56,6 +56,121 @@ function renderScreenshot(t) {
   card.classList.remove("chart-placeholder");
   card.innerHTML = `<a href="${src}" target="_blank" rel="noopener">
     <img class="trade-shot" src="${src}" alt="ATAS Screenshot bei Trade-Abschluss" /></a>`;
+}
+
+// Chart card precedence: interactive candlestick chart -> screenshot -> placeholder.
+async function renderChart(t) {
+  const card = document.getElementById("chartShot");
+  if (!card) return;
+  if (!t.chart) return renderScreenshot(t);
+  let data;
+  try {
+    const r = await fetch(`/api/trades/${t.id}/chart`);
+    if (!r.ok) throw new Error();
+    data = await r.json();
+    if (!Array.isArray(data.candles) || !data.candles.length) throw new Error();
+  } catch {
+    return renderScreenshot(t);
+  }
+  drawTradeChart(card, t, data);
+}
+
+function drawTradeChart(card, t, data) {
+  card.classList.remove("chart-placeholder");
+  card.innerHTML = `<div class="tv-chart" id="tvChart"></div><div class="chart-overlay" id="chartOverlay"></div>`;
+  const host = document.getElementById("tvChart");
+  const overlay = document.getElementById("chartOverlay");
+
+  const chart = LightweightCharts.createChart(host, {
+    layout: { background: { color: "transparent" }, textColor: "#7d8898", fontSize: 11 },
+    grid: { vertLines: { color: "rgba(255,255,255,0.04)" }, horzLines: { color: "rgba(255,255,255,0.04)" } },
+    rightPriceScale: { borderColor: "rgba(255,255,255,0.08)" },
+    timeScale: { borderColor: "rgba(255,255,255,0.08)", timeVisible: true, secondsVisible: false },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    autoSize: true,
+  });
+
+  const candles = data.candles.map((c) => ({ time: c.t, open: c.o, high: c.h, low: c.l, close: c.c }));
+  // Keep TP/SL (and entry/exit) inside the price scale even when price never reached them.
+  const extras = [data.tp, data.sl, data.entry_price, data.exit_price].filter((v) => v != null);
+  const series = chart.addCandlestickSeries({
+    upColor: "#26a69a", downColor: "#ef5350", borderVisible: false,
+    wickUpColor: "#26a69a", wickDownColor: "#ef5350",
+    autoscaleInfoProvider: (orig) => {
+      const res = orig();
+      if (!res || !extras.length) return res;
+      let { minValue, maxValue } = res.priceRange;
+      for (const v of extras) { minValue = Math.min(minValue, v); maxValue = Math.max(maxValue, v); }
+      return { priceRange: { minValue, maxValue } };
+    },
+  });
+  series.setData(candles);
+
+  // Entry (Buy/Sell) price line + TP/SL lines.
+  const isBuy = (data.direction || "").toLowerCase().startsWith("b") || t.direction === "long";
+  const priceLine = (price, color, title) => {
+    if (price == null) return;
+    series.createPriceLine({ price, color, lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed, axisLabelVisible: true, title });
+  };
+  priceLine(data.entry_price, isBuy ? "#3b9eff" : "#ec4899", `${isBuy ? "Buy" : "Sell"} x${data.volume ?? t.volume}`);
+  priceLine(data.tp, "#22c55e", "TP");
+  priceLine(data.sl, "#ef4444", "SL");
+
+  // Entry/exit arrow markers.
+  series.setMarkers([
+    { time: data.entry_time, position: isBuy ? "belowBar" : "aboveBar", color: GOLD, shape: isBuy ? "arrowUp" : "arrowDown" },
+    { time: data.exit_time, position: isBuy ? "aboveBar" : "belowBar", color: GOLD, shape: isBuy ? "arrowDown" : "arrowUp" },
+  ]);
+
+  // Yellow dashed entry -> exit diagonal as a 2-point line series.
+  const diag = chart.addLineSeries({ color: GOLD, lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
+  diag.setData([
+    { time: data.entry_time, value: data.entry_price },
+    { time: data.exit_time, value: data.exit_price },
+  ]);
+
+  chart.timeScale().fitContent();
+
+  // Coordinate-synced overlay: green reward zone, red risk zone, "+X ticks" badge.
+  const ticks = tradeTicks(t);
+  const sync = () => positionOverlay(overlay, chart, series, data, ticks);
+  chart.timeScale().subscribeVisibleTimeRangeChange(sync);
+  new ResizeObserver(sync).observe(host);
+  sync();
+}
+
+// Places the zone rectangles + tick badge over the chart using data->pixel conversion.
+function positionOverlay(overlay, chart, series, data, ticks) {
+  overlay.innerHTML = "";
+  const ts = chart.timeScale();
+  const x1 = ts.timeToCoordinate(data.entry_time);
+  const x2 = ts.timeToCoordinate(data.exit_time);
+  const yEntry = series.priceToCoordinate(data.entry_price);
+  if (x1 == null || x2 == null || yEntry == null) return;
+  const left = Math.min(x1, x2), width = Math.abs(x2 - x1);
+
+  const box = (top, height, cls) => {
+    const d = document.createElement("div");
+    d.className = cls;
+    d.style.cssText = `left:${left}px;width:${width}px;top:${top}px;height:${height}px`;
+    overlay.appendChild(d);
+  };
+  if (data.tp != null) {
+    const yTp = series.priceToCoordinate(data.tp);
+    if (yTp != null) box(Math.min(yTp, yEntry), Math.abs(yEntry - yTp), "zone-green");
+  }
+  if (data.sl != null) {
+    const ySl = series.priceToCoordinate(data.sl);
+    if (ySl != null) box(Math.min(ySl, yEntry), Math.abs(ySl - yEntry), "zone-red");
+  }
+  if (ticks != null) {
+    const yExit = series.priceToCoordinate(data.exit_price);
+    const badge = document.createElement("div");
+    badge.className = "ticks-badge";
+    badge.textContent = `${ticks > 0 ? "+" : ""}${ticks} Ticks`;
+    badge.style.cssText = `left:${(x1 + x2) / 2}px;top:${(yEntry + (yExit ?? yEntry)) / 2}px`;
+    overlay.appendChild(badge);
+  }
 }
 
 let current = null;

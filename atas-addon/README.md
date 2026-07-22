@@ -14,6 +14,17 @@ trade P&L. This add-on reads the real trade data from inside ATAS instead.
 - At trade close it also captures a **screenshot spanning all monitors** and sends it
   with the trade, so the dashboard shows how the trade played out. Toggle this off with
   the **Capture Screenshot** setting on the indicator.
+- A few minutes **after** the trade closes it sends a **candle window** (history +
+  post-exit "future" bars) plus best-effort TP/SL, which the dashboard renders as an
+  interactive chart. This second message is delayed on purpose — the bars after your
+  exit don't exist yet at close. Settings: **Capture Chart** (on/off), **Chart Lookback
+  Bars** (default 30), **Chart Lookahead Bars** (default 15, how long it waits after
+  exit). If ATAS is closed before the lookahead elapses, that trade gets no chart (the
+  trade + screenshot are unaffected — they send immediately).
+
+  > TP/SL is read from the position's working bracket orders via reflection and is the
+  > least-certain part across ATAS versions. If the chart shows no TP/SL lines/zones,
+  > send me the `[chart] ...` lines from the log and I'll adjust the order-field names.
 - Logs every fill and every emitted trade to the ATAS log window so we can verify numbers.
 
 ## Prerequisites (Windows, one time)

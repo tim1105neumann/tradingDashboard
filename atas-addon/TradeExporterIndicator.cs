@@ -1,10 +1,13 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Net.Http;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using ATAS.DataFeedsCore;
@@ -38,6 +41,20 @@ namespace TradingDashboard
         [DisplayName("Capture Screenshot")]
         public bool CaptureScreenshot { get; set; } = true;
 
+        // When on, a candle window (history + post-exit "future" bars) plus best-effort
+        // TP/SL is sent a few minutes after the trade closes, for the interactive chart.
+        [DisplayName("Capture Chart")]
+        public bool CaptureChart { get; set; } = true;
+
+        [DisplayName("Chart Lookback Bars")]
+        public int ChartLookbackBars { get; set; } = 30;
+
+        [DisplayName("Chart Lookahead Bars")]
+        public int ChartLookaheadBars { get; set; } = 15;
+
+        // Candle chart is posted here; derived from WebhookUrl (…/webhook/atas -> …/webhook/atas/chart).
+        private string ChartUrl => WebhookUrl.TrimEnd('/') + "/chart";
+
         // --- Position tracking state (self-computed from fills) ---
         private decimal _net;          // signed net position (+long / -short)
         private int _posDir;           // direction of the currently open position (+1 / -1)
@@ -49,6 +66,29 @@ namespace TradingDashboard
         private DateTime _openTime;    // time of first entry fill
         private decimal _realizedBaseline; // ATAS realized PnL captured at last flat
         private string _account = "";      // account/portfolio id of the current trade
+
+        // --- Chart-capture state ---
+        private int _lastBar = -1;         // highest bar index seen in OnCalculate (the live bar)
+        private int _openBar = -1;         // bar index when the current position opened
+        private decimal? _lastTp;          // TP/SL snapshotted while the position is open
+        private decimal? _lastSl;          //   (brackets are gone once flat, so we poll live)
+        private readonly List<PendingChart> _pendingCharts = new List<PendingChart>();
+        private readonly object _pendingLock = new object();
+
+        // One queued chart: assembled + POSTed once enough post-exit bars have formed.
+        private sealed class PendingChart
+        {
+            public string ExternalId = "";
+            public string Side = "Buy";
+            public decimal Volume;
+            public int OpenBar;
+            public int CloseBar;
+            public decimal EntryPrice;
+            public decimal ExitPrice;
+            public decimal? Tp;
+            public decimal? Sl;
+            public int TargetBar; // fire once _lastBar reaches this
+        }
 
         // Diagnostics are written to this file (open it and paste lines back to iterate).
         private static readonly string LogPath = Path.Combine(
@@ -62,7 +102,13 @@ namespace TradingDashboard
             EnableCustomDrawing = false;
         }
 
-        protected override void OnCalculate(int bar, decimal value) { }
+        protected override void OnCalculate(int bar, decimal value)
+        {
+            if (bar > _lastBar) _lastBar = bar;
+            // Brackets disappear once the position is flat, so snapshot TP/SL while open.
+            if (CaptureChart && _net != 0) PollProtectiveOrders();
+            FlushPendingCharts();
+        }
 
         protected override void OnNewMyTrade(MyTrade myTrade)
         {
@@ -88,6 +134,7 @@ namespace TradingDashboard
                     {
                         // Opening a fresh position.
                         _openTime = time;
+                        _openBar = _lastBar >= 0 ? _lastBar : CurrentBar;
                         _posDir = dirSign;
                         _entryVol += remaining;
                         _entryValue += remaining * price;
@@ -138,12 +185,152 @@ namespace TradingDashboard
             _realizedBaseline = realizedNow;
 
             var side = _posDir > 0 ? "Buy" : "Sell";
+            // One id shared by the trade POST and the (delayed) chart POST, so the
+            // server can correlate them.
+            var externalId = Guid.NewGuid().ToString("N");
 
             Log($"[export] TRADE {symbol} {side} vol={_exitVol} entry={avgEntry} exit={avgExit} pnl={pnl} comm={_commission}");
 
             var screenshot = CaptureScreenshot ? CaptureAllScreensJpegBase64() : null;
-            var json = BuildJson(symbol, side, _exitVol, avgEntry, avgExit, _openTime, closeTime, pnl, _commission, _account, screenshot);
-            PostAsync(json);
+            var json = BuildJson(externalId, symbol, side, _exitVol, avgEntry, avgExit, _openTime, closeTime, pnl, _commission, _account, screenshot);
+            PostAsync(WebhookUrl, json);
+
+            if (CaptureChart)
+            {
+                var closeBar = _lastBar >= 0 ? _lastBar : CurrentBar;
+                lock (_pendingLock)
+                {
+                    _pendingCharts.Add(new PendingChart
+                    {
+                        ExternalId = externalId,
+                        Side = side,
+                        Volume = _exitVol,
+                        OpenBar = _openBar >= 0 ? _openBar : closeBar,
+                        CloseBar = closeBar,
+                        EntryPrice = avgEntry,
+                        ExitPrice = avgExit,
+                        Tp = _lastTp,
+                        Sl = _lastSl,
+                        TargetBar = closeBar + ChartLookaheadBars,
+                    });
+                }
+                Log($"[chart] queued {externalId} openBar={_openBar} closeBar={closeBar} target={closeBar + ChartLookaheadBars} tp={_lastTp} sl={_lastSl}");
+            }
+        }
+
+        // --- Delayed chart window (candles + TP/SL) ---
+
+        // Send any queued charts whose lookahead window has now formed.
+        private void FlushPendingCharts()
+        {
+            if (_pendingCharts.Count == 0) return;
+            var ready = new List<PendingChart>();
+            lock (_pendingLock)
+            {
+                for (int i = _pendingCharts.Count - 1; i >= 0; i--)
+                {
+                    if (_lastBar >= _pendingCharts[i].TargetBar)
+                    {
+                        ready.Add(_pendingCharts[i]);
+                        _pendingCharts.RemoveAt(i);
+                    }
+                }
+            }
+            foreach (var pc in ready) SendChart(pc);
+        }
+
+        private void SendChart(PendingChart pc)
+        {
+            try
+            {
+                var ci = CultureInfo.InvariantCulture;
+                int from = Math.Max(0, pc.OpenBar - ChartLookbackBars);
+                int to = Math.Min(_lastBar, pc.CloseBar + ChartLookaheadBars);
+
+                var sb = new StringBuilder();
+                sb.Append('{');
+                sb.Append($"\"external_id\":\"{pc.ExternalId}\",");
+                sb.Append($"\"direction\":\"{pc.Side}\",");
+                sb.Append($"\"volume\":{pc.Volume.ToString(ci)},");
+                sb.Append($"\"entry_time\":{ToUnix(GetCandle(pc.OpenBar).Time)},");
+                sb.Append($"\"exit_time\":{ToUnix(GetCandle(pc.CloseBar).Time)},");
+                sb.Append($"\"entry_price\":{pc.EntryPrice.ToString(ci)},");
+                sb.Append($"\"exit_price\":{pc.ExitPrice.ToString(ci)},");
+                sb.Append($"\"tp\":{(pc.Tp.HasValue ? pc.Tp.Value.ToString(ci) : "null")},");
+                sb.Append($"\"sl\":{(pc.Sl.HasValue ? pc.Sl.Value.ToString(ci) : "null")},");
+                sb.Append("\"candles\":[");
+                for (int i = from; i <= to; i++)
+                {
+                    var c = GetCandle(i);
+                    if (i > from) sb.Append(',');
+                    sb.Append($"{{\"t\":{ToUnix(c.Time)},\"o\":{c.Open.ToString(ci)},\"h\":{c.High.ToString(ci)},\"l\":{c.Low.ToString(ci)},\"c\":{c.Close.ToString(ci)}}}");
+                }
+                sb.Append("]}");
+
+                Log($"[chart] sending {pc.ExternalId} bars {from}..{to} ({to - from + 1} candles)");
+                PostAsync(ChartUrl, sb.ToString());
+            }
+            catch (Exception ex)
+            {
+                Log($"[chart] send failed: {ex.Message}");
+            }
+        }
+
+        private static long ToUnix(DateTime t)
+            => new DateTimeOffset(DateTime.SpecifyKind(t, DateTimeKind.Utc)).ToUnixTimeSeconds();
+
+        // Best-effort TP/SL from the position's working protective orders. ATAS's order
+        // object shape varies by version, so this reads via reflection and logs what it
+        // sees — never throws. Refine once the log shows the real order fields.
+        private void PollProtectiveOrders()
+        {
+            try
+            {
+                var tm = TradingManager;
+                if (tm == null) return;
+                var ordersObj = tm.GetType().GetProperty("Orders")?.GetValue(tm)
+                             ?? tm.GetType().GetProperty("ActiveOrders")?.GetValue(tm);
+                if (ordersObj is not IEnumerable orders) return;
+
+                decimal? tp = null, sl = null;
+                foreach (var o in orders)
+                {
+                    if (o == null) continue;
+                    var t = o.GetType();
+                    string type = t.GetProperty("Type")?.GetValue(o)?.ToString() ?? "";
+                    string dir = t.GetProperty("Direction")?.GetValue(o)?.ToString() ?? "";
+                    string state = (t.GetProperty("State") ?? t.GetProperty("Status"))?.GetValue(o)?.ToString() ?? "";
+                    // Skip orders that are no longer working.
+                    if (state.IndexOf("Filled", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        state.IndexOf("Cancel", StringComparison.OrdinalIgnoreCase) >= 0) continue;
+
+                    decimal price = ToDecimal(t.GetProperty("TriggerPrice")?.GetValue(o))
+                                 ?? ToDecimal(t.GetProperty("Price")?.GetValue(o)) ?? 0m;
+                    if (price == 0m) continue;
+
+                    // Protective orders are opposite the position side.
+                    bool opposite = _posDir > 0
+                        ? dir.IndexOf("Sell", StringComparison.OrdinalIgnoreCase) >= 0
+                        : dir.IndexOf("Buy", StringComparison.OrdinalIgnoreCase) >= 0;
+                    if (!opposite) continue;
+
+                    if (type.IndexOf("Stop", StringComparison.OrdinalIgnoreCase) >= 0) sl = price;
+                    else if (type.IndexOf("Limit", StringComparison.OrdinalIgnoreCase) >= 0) tp = price;
+                }
+                if (tp.HasValue) _lastTp = tp;
+                if (sl.HasValue) _lastSl = sl;
+            }
+            catch (Exception ex)
+            {
+                Log($"[chart] TP/SL poll failed: {ex.Message}");
+            }
+        }
+
+        private static decimal? ToDecimal(object? v)
+        {
+            if (v == null) return null;
+            try { return Convert.ToDecimal(v, CultureInfo.InvariantCulture); }
+            catch { return null; }
         }
 
         // --- Screenshot capture (all monitors) ---
@@ -199,16 +386,19 @@ namespace TradingDashboard
             _exitVol = 0;
             _exitValue = 0;
             _commission = 0;
+            _openBar = -1;
+            _lastTp = null;
+            _lastSl = null;
         }
 
-        private static string BuildJson(string symbol, string side, decimal volume,
+        private static string BuildJson(string externalId, string symbol, string side, decimal volume,
             decimal openPrice, decimal closePrice, DateTime openTime, DateTime closeTime,
             decimal pnl, decimal commission, string account, string? screenshot)
         {
             var ci = CultureInfo.InvariantCulture;
             var sb = new StringBuilder();
             sb.Append('{');
-            sb.Append($"\"id\":\"{Guid.NewGuid():N}\",");
+            sb.Append($"\"id\":\"{externalId}\",");
             sb.Append($"\"account\":\"{Escape(account)}\",");
             sb.Append($"\"symbol\":\"{Escape(symbol)}\",");
             sb.Append($"\"side\":\"{side}\",");
@@ -228,13 +418,13 @@ namespace TradingDashboard
 
         private static string Escape(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
 
-        private async void PostAsync(string json)
+        private async void PostAsync(string url, string json)
         {
             try
             {
                 using var content = new StringContent(json, Encoding.UTF8, "application/json");
-                var res = await Http.PostAsync(WebhookUrl, content).ConfigureAwait(false);
-                Log($"[export] POST {(int)res.StatusCode} -> {WebhookUrl}");
+                var res = await Http.PostAsync(url, content).ConfigureAwait(false);
+                Log($"[export] POST {(int)res.StatusCode} -> {url}");
             }
             catch (Exception ex)
             {

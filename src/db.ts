@@ -9,6 +9,9 @@ mkdirSync(dirname(DB_PATH), { recursive: true });
 /** Where per-trade ATAS screenshots (<id>.jpg) are stored. */
 export const SCREENSHOTS_DIR = resolve(process.cwd(), "data", "screenshots");
 
+/** Where per-trade candle chart windows (<id>.json) are stored. */
+export const CHARTS_DIR = resolve(process.cwd(), "data", "charts");
+
 export const db = new DatabaseSync(DB_PATH);
 db.exec("PRAGMA journal_mode = WAL;");
 
@@ -61,9 +64,10 @@ export interface Trade {
   rating: number;
   labels: string[];
   screenshot?: boolean; // set by getTradeById: true if an <id>.jpg exists on disk
+  chart?: boolean;      // set by getTradeById: true if a candle window <id>.json exists on disk
 }
 
-export type NewTrade = Omit<Trade, "id" | "received_at" | "rating" | "labels" | "screenshot">;
+export type NewTrade = Omit<Trade, "id" | "received_at" | "rating" | "labels" | "screenshot" | "chart">;
 
 // ATAS sends timestamps in UTC; this user is UTC+2 (Central European summer time),
 // so shift on read. All views (hour buckets, detail page, calendar) then show local
@@ -124,7 +128,13 @@ export function getTradeById(id: number): Trade | undefined {
   if (!row) return undefined;
   const trade = hydrate(row);
   trade.screenshot = existsSync(resolve(SCREENSHOTS_DIR, `${trade.id}.jpg`));
+  trade.chart = existsSync(resolve(CHARTS_DIR, `${trade.id}.json`));
   return trade;
+}
+
+export function getTradeByExternalId(externalId: string): Trade | undefined {
+  const row = db.prepare("SELECT * FROM trades WHERE external_id = ?").get(externalId) as Record<string, unknown> | undefined;
+  return row ? hydrate(row) : undefined;
 }
 
 export function updateNote(id: number, note: string): boolean {
