@@ -29,8 +29,6 @@ const NAV = [
   { key: "strategien", label: "Strategien", ico: "⟐", href: "#" },
   { key: "plan", label: "Trading-Plan", ico: "▢", href: "#" },
   { key: "community", label: "Community", ico: "◍", href: "#" },
-  { key: "import", label: "Import", ico: "⇩", href: "#" },
-  { key: "konten", label: "Konten", ico: "▥", href: "#" },
   { key: "settings", label: "Einstellungen", ico: "⚙", href: "settings.html" },
 ];
 

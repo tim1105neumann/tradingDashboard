@@ -341,9 +341,8 @@ function renderStats(t, data) {
   const tpDollar = toMoney(tpTicks);
   const slDollar = toMoney(slTicks);
 
-  // Excursions from the candle path.
+  // Excursions from the candle path (used by REAL CRV).
   const ex = excursions(t, data, ts);
-  const potDollar = ex ? toMoney(ex.mfe) : null;
 
   // Ratios.
   const crv = (tpTicks != null && slTicks) ? tpTicks / slTicks : null; // planned reward : risk
@@ -362,8 +361,6 @@ function renderStats(t, data) {
       ${statBox("STOP LOSS", slDollar == null ? dash : moneyEur(-Math.abs(slDollar)), "neg")}
       ${statBox("TP TICKS", ticks(tpTicks), "pos")}
       ${statBox("SL TICKS", ticks(slTicks), "neg")}
-      ${statBox("POTENTIAL", money(potDollar), "pos")}
-      ${statBox("SL BENÖTIGT", ex ? ticks(ex.mae) : dash, "neg")}
     </div>
     <div class="stat-section">PERFORMANCE</div>
     <div class="stat-grid">
