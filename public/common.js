@@ -1,6 +1,6 @@
 // Shared helpers + sidebar for all pages.
 // Colorblind-safe: blue = gain, orange = loss (distinguishable for red-green colorblindness).
-const GREEN = "#3b9eff", RED = "#ff8038", CYAN = "#22d3ee", GOLD = "#e9b308", GRAY = "#6b7280";
+const GREEN = "#3b9eff", RED = "#ff8038", CYAN = "#22d3ee", GOLD = "#f2b30a", GRAY = "#556072";
 const MONTHS = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
 
 const money = (n) => (n < 0 ? "-" : "") + "$" + Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -79,5 +79,5 @@ function renderSidebar(active) {
       `<a class="nav-item ${n.key === active ? "active" : ""}" href="${n.href}"><span class="ico">${n.ico}</span>${n.label}</a>`
   ).join("");
   document.getElementById("sidebar").innerHTML =
-    `<div class="brand"><div class="logo">🔥</div></div><nav class="nav">${items}</nav>`;
+    `<div class="brand"><span class="logo">🔥</span><span class="wordmark"><span>EMBER</span><small>TRADING&nbsp;TERMINAL</small></span></div><nav class="nav">${items}</nav>`;
 }
