@@ -175,7 +175,8 @@ namespace TradingDashboard
                 foreach (var c in ImageCodecInfo.GetImageEncoders())
                     if (c.FormatID == ImageFormat.Jpeg.Guid) { jpeg = c; break; }
                 using var p = new EncoderParameters(1);
-                p.Param[0] = new EncoderParameter(Encoder.Quality, 80L);
+                // Fully qualified: System.Text.Encoder would otherwise make `Encoder` ambiguous.
+                p.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 80L);
 
                 using var ms = new MemoryStream();
                 bmp.Save(ms, jpeg, p);

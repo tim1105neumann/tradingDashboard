@@ -11,8 +11,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Multi-monitor screenshot capture at trade close (Windows-only, matches net*-windows). -->
-    <PackageReference Include="System.Drawing.Common" Version="8.0.*" />
+    <!-- Provides System.Drawing.Common (v10, Windows-only) for the multi-monitor
+         screenshot capture. Uses the same Windows Desktop framework ATAS references,
+         so there's no version conflict (a NuGet System.Drawing.Common 8.x clashes). -->
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App" />
   </ItemGroup>
 
   <ItemGroup>
