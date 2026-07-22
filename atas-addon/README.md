@@ -11,6 +11,9 @@ trade P&L. This add-on reads the real trade data from inside ATAS instead.
 - Runs as an indicator on a chart of the instrument you trade.
 - Listens to your fills via `OnNewMyTrade`.
 - Tracks your net position; when it returns to **flat**, it POSTs one completed trade.
+- At trade close it also captures a **screenshot spanning all monitors** and sends it
+  with the trade, so the dashboard shows how the trade played out. Toggle this off with
+  the **Capture Screenshot** setting on the indicator.
 - Logs every fill and every emitted trade to the ATAS log window so we can verify numbers.
 
 ## Prerequisites (Windows, one time)

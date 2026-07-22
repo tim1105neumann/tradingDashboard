@@ -43,9 +43,19 @@ async function load() {
   renderStars(t);
   renderLabels(t);
   renderStats(t);
+  renderScreenshot(t);
   renderFillsOrders(t);
   renderUpl(t);
   setupNotes(t);
+}
+
+function renderScreenshot(t) {
+  const card = document.getElementById("chartShot");
+  if (!card || !t.screenshot) return; // keep the "not available" placeholder otherwise
+  const src = `/screenshots/${t.id}.jpg?v=${encodeURIComponent(t.received_at || "")}`;
+  card.classList.remove("chart-placeholder");
+  card.innerHTML = `<a href="${src}" target="_blank" rel="noopener">
+    <img class="trade-shot" src="${src}" alt="ATAS Screenshot bei Trade-Abschluss" /></a>`;
 }
 
 let current = null;

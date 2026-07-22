@@ -1,10 +1,13 @@
 import { DatabaseSync } from "node:sqlite";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { resolveSymbol } from "./instruments.js";
 
 const DB_PATH = resolve(process.cwd(), "data", "trades.db");
 mkdirSync(dirname(DB_PATH), { recursive: true });
+
+/** Where per-trade ATAS screenshots (<id>.jpg) are stored. */
+export const SCREENSHOTS_DIR = resolve(process.cwd(), "data", "screenshots");
 
 export const db = new DatabaseSync(DB_PATH);
 db.exec("PRAGMA journal_mode = WAL;");
@@ -57,9 +60,10 @@ export interface Trade {
   received_at: string;
   rating: number;
   labels: string[];
+  screenshot?: boolean; // set by getTradeById: true if an <id>.jpg exists on disk
 }
 
-export type NewTrade = Omit<Trade, "id" | "received_at" | "rating" | "labels">;
+export type NewTrade = Omit<Trade, "id" | "received_at" | "rating" | "labels" | "screenshot">;
 
 // ATAS sends timestamps in UTC; this user is UTC+2 (Central European summer time),
 // so shift on read. All views (hour buckets, detail page, calendar) then show local
@@ -117,7 +121,10 @@ export function getTrades(): Trade[] {
 
 export function getTradeById(id: number): Trade | undefined {
   const row = db.prepare("SELECT * FROM trades WHERE id = ?").get(id) as Record<string, unknown> | undefined;
-  return row ? hydrate(row) : undefined;
+  if (!row) return undefined;
+  const trade = hydrate(row);
+  trade.screenshot = existsSync(resolve(SCREENSHOTS_DIR, `${trade.id}.jpg`));
+  return trade;
 }
 
 export function updateNote(id: number, note: string): boolean {

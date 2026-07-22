@@ -1,18 +1,26 @@
 import express from "express";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { getSetting, getTradeById, getTrades, insertTrade, setSetting, updateLabels, updateNote, updateRating } from "./db.js";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { getSetting, getTradeById, getTrades, insertTrade, setSetting, updateLabels, updateNote, updateRating, SCREENSHOTS_DIR } from "./db.js";
 import { NormalizeError, normalizeAtasTrade } from "./normalize.js";
 import { computeAnalytics, computeMetrics } from "./metrics.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 4000;
 
+mkdirSync(SCREENSHOTS_DIR, { recursive: true });
+
 const app = express();
-app.use(express.json({ limit: "256kb" }));
+// Limit is generous because trades can carry a base64 screenshot spanning all monitors.
+app.use(express.json({ limit: "20mb" }));
 
 // --- Live sync: ATAS webhook receiver ---
 app.post("/webhook/atas", (req, res) => {
+  // Strip the (potentially large) screenshot before logging/normalizing so it never
+  // bloats the console log or the `raw` column; it's stored as a file after insert.
+  const screenshot = typeof req.body?.screenshot === "string" ? (req.body.screenshot as string) : null;
+  if (req.body && "screenshot" in req.body) delete req.body.screenshot;
   console.log("[webhook] RAW PAYLOAD >>>", JSON.stringify(req.body));
   try {
     const trade = normalizeAtasTrade(req.body ?? {});
@@ -20,6 +28,14 @@ app.post("/webhook/atas", (req, res) => {
     if (id == null) {
       console.log(`[webhook] duplicate ignored (external_id=${trade.external_id})`);
       return res.status(200).json({ status: "duplicate" });
+    }
+    if (screenshot) {
+      try {
+        writeFileSync(resolve(SCREENSHOTS_DIR, `${id}.jpg`), Buffer.from(screenshot, "base64"));
+        console.log(`[webhook] saved screenshot for trade #${id} (${Math.round(screenshot.length / 1024)} KB base64)`);
+      } catch (e) {
+        console.error(`[webhook] failed to save screenshot for trade #${id}`, e);
+      }
     }
     console.log(`[webhook] stored trade #${id}: ${trade.symbol} ${trade.direction} pnl=${trade.pnl}`);
     res.status(201).json({ status: "stored", id });
@@ -91,6 +107,9 @@ app.put("/api/trades/:id/labels", (req, res) => {
   if (!ok) return res.status(404).json({ error: "not found" });
   res.json({ status: "saved" });
 });
+
+// --- Trade screenshots (saved from the ATAS add-on) ---
+app.use("/screenshots", express.static(SCREENSHOTS_DIR));
 
 // --- Static dashboard UI ---
 app.use(express.static(resolve(__dirname, "..", "public")));

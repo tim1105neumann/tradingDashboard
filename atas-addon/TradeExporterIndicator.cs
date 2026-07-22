@@ -1,8 +1,11 @@
 using System;
 using System.ComponentModel;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Text;
 using ATAS.DataFeedsCore;
 using ATAS.Indicators;
@@ -29,6 +32,11 @@ namespace TradingDashboard
         // Configurable in the indicator's settings panel.
         [DisplayName("Webhook URL")]
         public string WebhookUrl { get; set; } = "http://localhost:4000/webhook/atas";
+
+        // When on, a screenshot spanning ALL monitors is captured at trade close and
+        // sent with the trade so the dashboard can show how the trade played out.
+        [DisplayName("Capture Screenshot")]
+        public bool CaptureScreenshot { get; set; } = true;
 
         // --- Position tracking state (self-computed from fills) ---
         private decimal _net;          // signed net position (+long / -short)
@@ -133,8 +141,53 @@ namespace TradingDashboard
 
             Log($"[export] TRADE {symbol} {side} vol={_exitVol} entry={avgEntry} exit={avgExit} pnl={pnl} comm={_commission}");
 
-            var json = BuildJson(symbol, side, _exitVol, avgEntry, avgExit, _openTime, closeTime, pnl, _commission, _account);
+            var screenshot = CaptureScreenshot ? CaptureAllScreensJpegBase64() : null;
+            var json = BuildJson(symbol, side, _exitVol, avgEntry, avgExit, _openTime, closeTime, pnl, _commission, _account, screenshot);
             PostAsync(json);
+        }
+
+        // --- Screenshot capture (all monitors) ---
+        [DllImport("user32.dll")]
+        private static extern int GetSystemMetrics(int index);
+        private const int SM_XVIRTUALSCREEN = 76, SM_YVIRTUALSCREEN = 77,
+                          SM_CXVIRTUALSCREEN = 78, SM_CYVIRTUALSCREEN = 79;
+
+        /// <summary>
+        /// Grabs the entire virtual desktop (all monitors) as a JPEG and returns it
+        /// base64-encoded, or null on any failure — a screenshot must never break the
+        /// trade export.
+        /// </summary>
+        private string? CaptureAllScreensJpegBase64()
+        {
+            try
+            {
+                int x = GetSystemMetrics(SM_XVIRTUALSCREEN);
+                int y = GetSystemMetrics(SM_YVIRTUALSCREEN);
+                int w = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+                int h = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+                if (w <= 0 || h <= 0) { Log("[export] screenshot skipped: virtual screen size unknown"); return null; }
+
+                using var bmp = new Bitmap(w, h, PixelFormat.Format24bppRgb);
+                using (var g = Graphics.FromImage(bmp))
+                    g.CopyFromScreen(x, y, 0, 0, new Size(w, h));
+
+                var jpeg = ImageCodecInfo.GetImageEncoders()[0];
+                foreach (var c in ImageCodecInfo.GetImageEncoders())
+                    if (c.FormatID == ImageFormat.Jpeg.Guid) { jpeg = c; break; }
+                using var p = new EncoderParameters(1);
+                p.Param[0] = new EncoderParameter(Encoder.Quality, 80L);
+
+                using var ms = new MemoryStream();
+                bmp.Save(ms, jpeg, p);
+                var bytes = ms.ToArray();
+                Log($"[export] screenshot {w}x{h} {bytes.Length / 1024} KB");
+                return Convert.ToBase64String(bytes);
+            }
+            catch (Exception ex)
+            {
+                Log($"[export] screenshot failed: {ex.Message}");
+                return null;
+            }
         }
 
         private void ResetRoundTrip()
@@ -149,7 +202,7 @@ namespace TradingDashboard
 
         private static string BuildJson(string symbol, string side, decimal volume,
             decimal openPrice, decimal closePrice, DateTime openTime, DateTime closeTime,
-            decimal pnl, decimal commission, string account)
+            decimal pnl, decimal commission, string account, string? screenshot)
         {
             var ci = CultureInfo.InvariantCulture;
             var sb = new StringBuilder();
@@ -165,6 +218,9 @@ namespace TradingDashboard
             sb.Append($"\"close_time\":\"{closeTime.ToString("s", ci)}\",");
             sb.Append($"\"pnl\":{pnl.ToString(ci)},");
             sb.Append($"\"commission\":{commission.ToString(ci)}");
+            // base64 is JSON-safe (only [A-Za-z0-9+/=]), so no escaping needed.
+            if (!string.IsNullOrEmpty(screenshot))
+                sb.Append($",\"screenshot\":\"{screenshot}\"");
             sb.Append('}');
             return sb.ToString();
         }

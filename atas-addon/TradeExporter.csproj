@@ -11,6 +11,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Multi-monitor screenshot capture at trade close (Windows-only, matches net*-windows). -->
+    <PackageReference Include="System.Drawing.Common" Version="8.0.*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="ATAS.Indicators">
       <HintPath>$(AtasDir)\ATAS.Indicators.dll</HintPath>
       <Private>false</Private>
