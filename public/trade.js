@@ -44,25 +44,27 @@ async function load() {
   renderLabels(t);
   renderStats(t);
   renderChart(t);
+  renderScreenshot(t);
   renderFillsOrders(t);
   renderUpl(t);
   setupNotes(t);
 }
 
+// ATAS screenshot lives in its own card (revealed only when one exists).
 function renderScreenshot(t) {
-  const card = document.getElementById("chartShot");
-  if (!card || !t.screenshot) return; // keep the "not available" placeholder otherwise
+  const wrap = document.getElementById("shotWrap");
+  const card = document.getElementById("shotCard");
+  if (!wrap || !card || !t.screenshot) return;
   const src = `/screenshots/${t.id}.jpg?v=${encodeURIComponent(t.received_at || "")}`;
-  card.classList.remove("chart-placeholder");
   card.innerHTML = `<a href="${src}" target="_blank" rel="noopener">
     <img class="trade-shot" src="${src}" alt="ATAS Screenshot bei Trade-Abschluss" /></a>`;
+  wrap.style.display = "";
 }
 
-// Chart card precedence: interactive candlestick chart -> screenshot -> placeholder.
+// Chart card: interactive candlestick chart when candle data exists, else placeholder.
 async function renderChart(t) {
   const card = document.getElementById("chartShot");
-  if (!card) return;
-  if (!t.chart) return renderScreenshot(t);
+  if (!card || !t.chart) return; // leaves the "Chart Data Not Available Yet" placeholder
   let data;
   try {
     const r = await fetch(`/api/trades/${t.id}/chart`);
@@ -70,7 +72,7 @@ async function renderChart(t) {
     data = await r.json();
     if (!Array.isArray(data.candles) || !data.candles.length) throw new Error();
   } catch {
-    return renderScreenshot(t);
+    return;
   }
   drawTradeChart(card, t, data);
 }
