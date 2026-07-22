@@ -12,6 +12,8 @@ const fmtTime = (t) => (t || "").replace("T", " ").slice(0, 16);
 
 // Tick sizes per ticker (symbol is already mapped to a clean ticker server-side).
 const TICK_SIZE = { MNQ: 0.25, MES: 0.25, NQ: 0.25, ES: 0.25 };
+// $ per tick per contract (mirrors src/instruments.ts) — used for stat $ conversions.
+const TICK_VALUE = { MNQ: 0.5, MES: 1.25, NQ: 5, ES: 12.5 };
 function tradeTicks(t) {
   const ts = TICK_SIZE[t.symbol];
   if (ts == null || t.open_price == null || t.close_price == null) return null;

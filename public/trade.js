@@ -42,8 +42,9 @@ async function load() {
   renderSummary(t);
   renderStars(t);
   renderLabels(t);
-  renderStats(t);
-  renderChart(t);
+  const chartData = await loadChart(t);
+  renderStats(t, chartData);
+  renderChart(t, chartData);
   renderScreenshot(t);
   renderFillsOrders(t);
   renderUpl(t);
@@ -61,19 +62,21 @@ function renderScreenshot(t) {
   wrap.style.display = "";
 }
 
-// Chart card: interactive candlestick chart when candle data exists, else placeholder.
-async function renderChart(t) {
-  const card = document.getElementById("chartShot");
-  if (!card || !t.chart) return; // leaves the "Chart Data Not Available Yet" placeholder
-  let data;
+// Fetch the trade's candle window once (shared by the chart AND the statistics card).
+async function loadChart(t) {
+  if (!t.chart) return null;
   try {
     const r = await fetch(`/api/trades/${t.id}/chart`);
-    if (!r.ok) throw new Error();
-    data = await r.json();
-    if (!Array.isArray(data.candles) || !data.candles.length) throw new Error();
-  } catch {
-    return;
-  }
+    if (!r.ok) return null;
+    const d = await r.json();
+    return Array.isArray(d.candles) && d.candles.length ? d : null;
+  } catch { return null; }
+}
+
+// Chart card: interactive candlestick chart when candle data exists, else placeholder.
+function renderChart(t, data) {
+  const card = document.getElementById("chartShot");
+  if (!card || !data) return; // leaves the "Chart Data Not Available Yet" placeholder
   drawTradeChart(card, t, data);
 }
 
@@ -302,24 +305,71 @@ function statBox(label, value, cl) {
   return `<div class="stat-box"><span class="tlabel">${label}</span><div class="${cl || ""}">${value}</div></div>`;
 }
 
-function renderStats(t) {
+// Max favorable / adverse excursion (ticks) over the trade's holding window, from candles.
+function excursions(t, data, ts) {
+  if (!data || !Array.isArray(data.candles) || !ts || data.entry_price == null) return null;
+  const e = data.entry_price;
+  const dir = t.direction === "short" ? -1 : 1;
+  const win = data.candles.filter((c) => c.t >= data.entry_time && c.t <= data.exit_time);
+  const bars = win.length ? win : data.candles;
+  let hi = -Infinity, lo = Infinity;
+  for (const c of bars) { if (c.h > hi) hi = c.h; if (c.l < lo) lo = c.l; }
+  if (!Number.isFinite(hi) || !Number.isFinite(lo)) return null;
+  const favPrice = dir > 0 ? hi : lo; // best move in your favour
+  const advPrice = dir > 0 ? lo : hi; // worst move against you
+  return {
+    mfe: Math.max(0, Math.round((dir * (favPrice - e)) / ts)),
+    mae: Math.max(0, Math.round((dir * (e - advPrice)) / ts)),
+  };
+}
+
+// Fills the statistics card from the trade + (when present) its chart bracket/candle data.
+// TP/SL-derived boxes need the add-on's bracket data; excursion boxes need candles.
+// Anything we can't compute stays "–".
+function renderStats(t, data) {
+  const dash = "–";
+  const ts = TICK_SIZE[t.symbol], tv = TICK_VALUE[t.symbol];
+  const dir = t.direction === "short" ? -1 : 1;
   const n = net(t);
-  const tk = tradeTicks(t);
+  const e = data?.entry_price ?? t.open_price;
+  const tp = data?.tp ?? null, sl = data?.sl ?? null;
+
+  // Planned bracket distances (ticks): TP above/below entry, SL as a positive risk distance.
+  const tpTicks = (tp != null && e != null && ts) ? Math.round((dir * (tp - e)) / ts) : null;
+  const slTicks = (sl != null && e != null && ts) ? Math.round((dir * (e - sl)) / ts) : null;
+  const toMoney = (ticks) => (ticks != null && tv != null) ? ticks * tv * t.volume : null;
+  const tpDollar = toMoney(tpTicks);
+  const slDollar = toMoney(slTicks);
+
+  // Excursions from the candle path.
+  const ex = excursions(t, data, ts);
+  const potDollar = ex ? toMoney(ex.mfe) : null;
+
+  // Ratios.
+  const crv = (tpTicks != null && slTicks) ? tpTicks / slTicks : null; // planned reward : risk
+  const realCrv = (ex && ex.mae) ? ex.mfe / ex.mae : null;            // actual MFE : MAE from price
+  const roi = slDollar ? n / Math.abs(slDollar) : null;              // R-multiple on planned risk
+
+  const money = (v) => v == null ? dash : moneyEur(v);
+  const ticks = (v) => v == null ? dash : `${v} T`;
+  const ratio = (v) => v == null ? dash : `1 : ${v.toFixed(2)}`;
+  const rMult = (v) => v == null ? dash : `${v >= 0 ? "+" : ""}${v.toFixed(2)} R`;
+
   document.getElementById("stats").innerHTML = `
     <div class="stat-section">MANAGEMENT</div>
     <div class="stat-grid">
-      ${statBox("TAKE PROFIT", n > 0 ? moneyEur(n) : "–", "pos")}
-      ${statBox("STOP LOSS", n < 0 ? moneyEur(n) : "–", "neg")}
-      ${statBox("TP TICKS", tk != null && tk > 0 ? tk : "–")}
-      ${statBox("SL TICKS", tk != null && tk < 0 ? tk : "–")}
-      ${statBox("POTENTIAL", "–")}
-      ${statBox("SL BENÖTIGT", "–")}
+      ${statBox("TAKE PROFIT", money(tpDollar), "pos")}
+      ${statBox("STOP LOSS", slDollar == null ? dash : moneyEur(-Math.abs(slDollar)), "neg")}
+      ${statBox("TP TICKS", ticks(tpTicks), "pos")}
+      ${statBox("SL TICKS", ticks(slTicks), "neg")}
+      ${statBox("POTENTIAL", money(potDollar), "pos")}
+      ${statBox("SL BENÖTIGT", ex ? ticks(ex.mae) : dash, "neg")}
     </div>
     <div class="stat-section">PERFORMANCE</div>
     <div class="stat-grid">
-      ${statBox("CRV", "–")}
-      ${statBox("REAL CRV", "–")}
-      ${statBox("ROI", "–")}
+      ${statBox("CRV", ratio(crv))}
+      ${statBox("REAL CRV", ratio(realCrv))}
+      ${statBox("ROI", rMult(roi), roi == null ? "" : roi >= 0 ? "pos" : "neg")}
     </div>`;
 }
 
